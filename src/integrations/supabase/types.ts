@@ -100,6 +100,7 @@ export type Database = {
       }
       integration_configs: {
         Row: {
+          bridge_token: string | null
           bridge_url: string | null
           created_at: string
           id: string
@@ -116,6 +117,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          bridge_token?: string | null
           bridge_url?: string | null
           created_at?: string
           id?: string
@@ -132,6 +134,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          bridge_token?: string | null
           bridge_url?: string | null
           created_at?: string
           id?: string
