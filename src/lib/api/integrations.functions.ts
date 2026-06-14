@@ -1,8 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import type { Database } from "@/integrations/supabase/types";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { pingBridge } from "@/lib/bridge/bridge-client";
 import { getOrRefreshToken, buildMaxApiConfig } from "@/lib/maxapi/maxapi-client";
+
+type IntegrationConfigInsert = Database["public"]["Tables"]["integration_configs"]["Insert"];
+type LojaUpdate = Database["public"]["Tables"]["lojas"]["Update"];
 
 const LojaInput = z.object({ loja_id: z.string().uuid() });
 
@@ -219,4 +223,130 @@ export const testMaxApiConnection = createServerFn({ method: "POST" })
     });
 
     return { status, mensagem, token_cached_until };
+  });
+
+// ---------------------------------------------------------------------------
+// getIntegrationConfig — lê config atual para pré-popular formulário
+// Não expõe bridge_token (retorna apenas se está preenchido)
+// ---------------------------------------------------------------------------
+
+export type IntegrationConfig = {
+  bridge_url: string | null;
+  bridge_token_configurado: boolean;
+  maxapi_url: string | null;
+  emp_id_maxdata: string | null;
+  terminal_maxdata: string | null;
+};
+
+export const getIntegrationConfig = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => LojaInput.parse(d))
+  .handler(async ({ data, context }): Promise<IntegrationConfig | null> => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: canManage } = await context.supabase.rpc("user_can_manage_loja", {
+      _user_id: context.userId, _loja_id: data.loja_id,
+    });
+    if (!canManage) throw new Error("Apenas owner/admin pode ver configurações de integração.");
+
+    const [{ data: cfg }, { data: loja }] = await Promise.all([
+      supabaseAdmin
+        .from("integration_configs")
+        .select("bridge_url, bridge_token, maxapi_url")
+        .eq("loja_id", data.loja_id)
+        .maybeSingle(),
+      supabaseAdmin
+        .from("lojas")
+        .select("emp_id_maxdata, terminal_maxdata")
+        .eq("id", data.loja_id)
+        .maybeSingle(),
+    ]);
+
+    if (!cfg && !loja) return null;
+
+    return {
+      bridge_url: cfg?.bridge_url ?? null,
+      bridge_token_configurado: !!(cfg?.bridge_token),
+      maxapi_url: cfg?.maxapi_url ?? null,
+      emp_id_maxdata: loja?.emp_id_maxdata ?? null,
+      terminal_maxdata: loja?.terminal_maxdata ?? null,
+    };
+  });
+
+// ---------------------------------------------------------------------------
+// saveIntegrationConfig — salva todas as credenciais MaxData de uma loja
+// Requer role owner/admin. Invalida cache do token MaxAPI ao salvar.
+// ---------------------------------------------------------------------------
+
+const SaveConfigInput = z.object({
+  loja_id: z.string().uuid(),
+  bridge_url: z.string().url("URL da Bridge inválida").optional().or(z.literal("")),
+  bridge_token: z.string().optional(),
+  maxapi_url: z.string().url("URL da MaxAPI inválida").optional().or(z.literal("")),
+  emp_id_maxdata: z.string().optional(),
+  terminal_maxdata: z.string().optional(),
+});
+
+export const saveIntegrationConfig = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => SaveConfigInput.parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: canManage } = await context.supabase.rpc("user_can_manage_loja", {
+      _user_id: context.userId, _loja_id: data.loja_id,
+    });
+    if (!canManage) throw new Error("Apenas owner/admin pode alterar configurações de integração.");
+
+    const { data: loja } = await supabaseAdmin
+      .from("lojas")
+      .select("empresa_id")
+      .eq("id", data.loja_id)
+      .maybeSingle();
+
+    const invalidaTokenMaxApi =
+      data.maxapi_url !== undefined ||
+      data.emp_id_maxdata !== undefined ||
+      data.terminal_maxdata !== undefined;
+
+    const cfgUpsert: IntegrationConfigInsert = { loja_id: data.loja_id };
+    if (data.bridge_url !== undefined) cfgUpsert.bridge_url = data.bridge_url || null;
+    if (data.bridge_token !== undefined && data.bridge_token !== "")
+      cfgUpsert.bridge_token = data.bridge_token;
+    if (data.maxapi_url !== undefined) cfgUpsert.maxapi_url = data.maxapi_url || null;
+    if (invalidaTokenMaxApi) {
+      cfgUpsert.maxapi_token_cache = null;
+      cfgUpsert.maxapi_token_expires_at = null;
+    }
+
+    await supabaseAdmin
+      .from("integration_configs")
+      .upsert(cfgUpsert, { onConflict: "loja_id" });
+
+    if (data.emp_id_maxdata !== undefined || data.terminal_maxdata !== undefined) {
+      const lojaUpdate: LojaUpdate = {};
+      if (data.emp_id_maxdata !== undefined) lojaUpdate.emp_id_maxdata = data.emp_id_maxdata;
+      if (data.terminal_maxdata !== undefined) lojaUpdate.terminal_maxdata = data.terminal_maxdata;
+      await supabaseAdmin.from("lojas").update(lojaUpdate).eq("id", data.loja_id);
+    }
+
+    const camposAlterados = [
+      data.bridge_url !== undefined && "bridge_url",
+      data.bridge_token !== undefined && data.bridge_token !== "" && "bridge_token",
+      data.maxapi_url !== undefined && "maxapi_url",
+      data.emp_id_maxdata !== undefined && "emp_id_maxdata",
+      data.terminal_maxdata !== undefined && "terminal_maxdata",
+    ].filter(Boolean);
+
+    await logAuditoria({
+      userId: context.userId,
+      empresa_id: loja?.empresa_id,
+      loja_id: data.loja_id,
+      acao: "SALVOU_CONFIG_INTEGRACAO",
+      entidade: "integration_configs",
+      entidade_id: data.loja_id,
+      detalhes: { campos_alterados: camposAlterados },
+    });
+
+    return { ok: true };
   });
