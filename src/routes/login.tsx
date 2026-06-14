@@ -4,9 +4,9 @@ import { Boxes, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { listarEmpresas } from "@/lib/services/integration.service";
-import { setEmpresa, setUser, getUser } from "@/lib/session";
-import type { Empresa } from "@/lib/types";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/lib/auth-context";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/login")({
   head: () => ({ meta: [{ title: "Entrar — FiscalStock MaxData" }] }),
@@ -15,41 +15,46 @@ export const Route = createFileRoute("/login")({
 
 function LoginPage() {
   const router = useRouter();
+  const { user, empresas, setEmpresaAtiva, refresh } = useAuth();
   const [email, setEmail] = useState("admin@maxdata.com.br");
-  const [senha, setSenha] = useState("admin");
-  const [step, setStep] = useState<"login" | "empresa">("login");
-  const [empresas, setEmpresas] = useState<Empresa[]>([]);
+  const [senha, setSenha] = useState("");
+  const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (getUser()) {
-      listarEmpresas().then((es) => {
-        setEmpresas(es);
-        setStep("empresa");
-      });
+    if (user && empresas.length === 1) {
+      setEmpresaAtiva(empresas[0].id);
+      router.navigate({ to: "/dashboard" });
     }
-  }, []);
+  }, [user, empresas, router, setEmpresaAtiva]);
 
   async function login(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 400));
-    setUser({ nome: email.split("@")[0], email });
-    const es = await listarEmpresas();
-    setEmpresas(es);
-    if (es.length === 1) {
-      setEmpresa(es[0]);
-      router.navigate({ to: "/dashboard" });
-    } else {
-      setStep("empresa");
-    }
-    setLoading(false);
+    try {
+      if (mode === "signin") {
+        const { error } = await supabase.auth.signInWithPassword({ email, password: senha });
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.auth.signUp({
+          email, password: senha,
+          options: { emailRedirectTo: `${window.location.origin}/dashboard` },
+        });
+        if (error) throw error;
+        toast.success("Conta criada. Verifique seu e-mail se necessário.");
+      }
+      await refresh();
+    } catch (err: unknown) {
+      toast.error((err as Error).message ?? "Erro ao autenticar");
+    } finally { setLoading(false); }
   }
 
-  function escolherEmpresa(e: Empresa) {
-    setEmpresa(e);
+  function escolherEmpresa(id: string) {
+    setEmpresaAtiva(id);
     router.navigate({ to: "/dashboard" });
   }
+
+  const step: "login" | "empresa" = user && empresas.length > 0 ? "empresa" : "login";
 
   return (
     <div className="grid min-h-screen md:grid-cols-2">
@@ -89,7 +94,7 @@ function LoginPage() {
           {step === "login" ? (
             <form onSubmit={login} className="space-y-5">
               <div>
-                <h2 className="text-2xl font-semibold">Entrar</h2>
+                <h2 className="text-2xl font-semibold">{mode === "signin" ? "Entrar" : "Criar conta"}</h2>
                 <p className="mt-1 text-sm text-muted-foreground">Acesse com suas credenciais MaxData.</p>
               </div>
               <div className="space-y-2">
@@ -101,8 +106,12 @@ function LoginPage() {
                 <Input id="senha" type="password" value={senha} onChange={(e) => setSenha(e.target.value)} required />
               </div>
               <Button type="submit" className="h-11 w-full" disabled={loading}>
-                {loading ? "Entrando..." : "Entrar"}
+                {loading ? "Processando..." : mode === "signin" ? "Entrar" : "Criar conta"}
               </Button>
+              <button type="button" onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
+                className="w-full text-center text-xs text-muted-foreground hover:text-foreground">
+                {mode === "signin" ? "Não tem conta? Criar uma" : "Já tem conta? Entrar"}
+              </button>
             </form>
           ) : (
             <div className="space-y-5">
@@ -112,18 +121,20 @@ function LoginPage() {
               </div>
               <div className="space-y-2">
                 {empresas.map((e) => (
-                  <button key={e.id} onClick={() => escolherEmpresa(e)}
+                  <button key={e.id} onClick={() => escolherEmpresa(e.id)}
                     className="flex w-full items-center justify-between rounded-md border p-4 text-left transition-colors hover:border-primary hover:bg-primary/5">
                     <div>
-                      <p className="font-medium">{e.nome}</p>
-                      <p className="text-xs text-muted-foreground">empId {e.empId} • Terminal {e.terminal}</p>
+                      <p className="font-medium">{e.nome_fantasia}</p>
+                      <p className="text-xs text-muted-foreground">{e.lojas.length} loja(s) • papel: {e.role_na_empresa}</p>
                     </div>
-                    <span className={`text-xs font-medium ${
-                      e.statusConexao === "online" ? "text-[color:var(--success)]" :
-                      e.statusConexao === "instavel" ? "text-[color:oklch(0.55_0.17_70)]" : "text-destructive"
-                    }`}>{e.statusConexao}</span>
+                    <span className="text-xs font-medium text-muted-foreground">{e.ativo ? "ativa" : "inativa"}</span>
                   </button>
                 ))}
+                {empresas.length === 0 && (
+                  <p className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+                    Você ainda não está vinculado a nenhuma empresa. Peça a um administrador para vincular seu usuário.
+                  </p>
+                )}
               </div>
             </div>
           )}
