@@ -92,17 +92,23 @@ function ProdutoDetalheContent() {
                 ⚠️ Os valores abaixo são <strong>simulados</strong>. A fórmula fiscal definitiva
                 será validada pelo Claude Code junto ao MaxManager.
               </p>
-              <dl className="divide-y text-sm">
-                <Row label="Inventário fiscal base" v={c.inventario_base} />
-                <Row label="(+) Entradas fiscais" v={c.entradas} tone="success" />
-                <Row label="(−) Saídas fiscais" v={-c.saidas} tone="danger" />
-                <Row label="(+) Devoluções" v={c.devolucoes} tone="success" />
-                <Row label="(±) Ajustes fiscais" v={c.ajustes} />
-                <div className="flex items-center justify-between pt-3 font-semibold">
-                  <span>Saldo fiscal calculado</span>
-                  <span className="tabular-nums">{d.estoque_fiscal}</span>
-                </div>
-              </dl>
+              {c ? (
+                <dl className="divide-y text-sm">
+                  <Row label="Inventário fiscal base" v={c.inventario_base} />
+                  <Row label="(+) Entradas fiscais" v={c.entradas} tone="success" />
+                  <Row label="(−) Saídas fiscais" v={-c.saidas} tone="danger" />
+                  <Row label="(+) Devoluções" v={c.devolucoes} tone="success" />
+                  <Row label="(±) Ajustes fiscais" v={c.ajustes} />
+                  <div className="flex items-center justify-between pt-3 font-semibold">
+                    <span>Saldo fiscal calculado</span>
+                    <span className="tabular-nums">{d.estoque_fiscal}</span>
+                  </div>
+                </dl>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Composição do estoque fiscal indisponível — aguardando validação.
+                </p>
+              )}
             </CardContent>
           </Card>
 

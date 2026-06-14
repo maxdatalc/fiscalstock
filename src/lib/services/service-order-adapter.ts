@@ -13,6 +13,8 @@ export interface IServiceOrderService {
     os_id: string;
     produto_id: string;
     quantidade: number;
+    valor_unitario?: number;
+    forcar_sem_fiscal?: boolean;
   }): Promise<{ ok: boolean; excedeu_fiscal: boolean; alerta: string | null }>;
 }
 
@@ -39,6 +41,8 @@ export class MockServiceOrderService implements IServiceOrderService {
     os_id: string;
     produto_id: string;
     quantidade: number;
+    valor_unitario?: number;
+    forcar_sem_fiscal?: boolean;
   }) {
     const os = mockOrdens.find((o) => o.id === input.os_id);
     if (os) {
@@ -91,6 +95,8 @@ export class ServerServiceOrderService implements IServiceOrderService {
     os_id: string;
     produto_id: string;
     quantidade: number;
+    valor_unitario?: number;
+    forcar_sem_fiscal?: boolean;
   }): Promise<{ ok: boolean; excedeu_fiscal: boolean; alerta: string | null }> {
     const lojaId = input.loja_id;
     if (!lojaId) return { ok: false, excedeu_fiscal: false, alerta: "Loja não especificada" };
@@ -100,7 +106,8 @@ export class ServerServiceOrderService implements IServiceOrderService {
         os_id: input.os_id,
         produto_id: input.produto_id,
         quantidade: input.quantidade,
-        valor_unitario: 0,
+        valor_unitario: input.valor_unitario ?? 0,
+        forcar_sem_fiscal: input.forcar_sem_fiscal ?? false,
       },
     })) as unknown as { ok: boolean; requer_confirmacao: boolean; alerta: string | null };
     return {

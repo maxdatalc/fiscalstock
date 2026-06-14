@@ -1,0 +1,1 @@
+ALTER TABLE public.integration_configs ADD COLUMN IF NOT EXISTS bridge_token text;
