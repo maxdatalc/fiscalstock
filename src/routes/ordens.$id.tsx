@@ -1,13 +1,15 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
+import { RequireLoja } from "@/components/RequireLoja";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { ChevronLeft, Plus } from "lucide-react";
-import { adicionarItem, buscarOrdem } from "@/lib/services/service-order.service";
+import { serviceOrderService } from "@/lib/services/service-order-adapter";
 import { ServiceOrderItemEditor } from "@/components/ServiceOrderItemEditor";
+import { useAuth } from "@/lib/auth-context";
 import type { OrdemServico } from "@/lib/types";
 
 export const Route = createFileRoute("/ordens/$id")({
@@ -16,18 +18,29 @@ export const Route = createFileRoute("/ordens/$id")({
 });
 
 function OSDetail() {
+  return (
+    <AppShell>
+      <RequireLoja>
+        <OSDetailContent />
+      </RequireLoja>
+    </AppShell>
+  );
+}
+
+function OSDetailContent() {
   const { id } = Route.useParams();
   const router = useRouter();
+  const { lojaAtiva } = useAuth();
   const [os, setOs] = useState<OrdemServico | null>(null);
   const [open, setOpen] = useState(false);
   const [reload, setReload] = useState(0);
 
-  useEffect(() => { buscarOrdem(id).then(setOs); }, [id, reload]);
+  // TODO CLAUDE: substituir por chamada real à MaxAPI (GET O.S. por id).
+  useEffect(() => { serviceOrderService.get(id).then(setOs); }, [id, reload]);
 
-  if (!os) return <AppShell><p className="text-sm text-muted-foreground">Carregando...</p></AppShell>;
+  if (!os) return <p className="text-sm text-muted-foreground">Carregando...</p>;
 
   return (
-    <AppShell>
       <div className="space-y-6">
         <Button variant="ghost" size="sm" onClick={() => router.history.back()} className="-ml-3">
           <ChevronLeft className="mr-1 h-4 w-4" /> Voltar
@@ -76,11 +89,18 @@ function OSDetail() {
           onOpenChange={setOpen}
           empresaId={os.empresaId}
           onAdd={async (item) => {
-            await adicionarItem(os.id, item);
+            // TODO CLAUDE:
+            // substituir simulação por chamada real à MaxAPI.
+            // escritas em O.S. devem ser feitas somente pela MaxAPI, nunca via SQL direto.
+            await serviceOrderService.addItem({
+              loja_id: lojaAtiva?.id,
+              os_id: os.id,
+              produto_id: item.produtoId,
+              quantidade: item.quantidade,
+            });
             setReload((r) => r + 1);
           }}
         />
       </div>
-    </AppShell>
   );
 }
