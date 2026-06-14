@@ -1,14 +1,12 @@
 import { Link, useRouter, useRouterState } from "@tanstack/react-router";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { Boxes, LayoutDashboard, ClipboardList, Settings, LogOut, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { clearSession, getEmpresa, getUser, setEmpresa } from "@/lib/session";
-import { listarEmpresas } from "@/lib/services/integration.service";
-import type { Empresa } from "@/lib/types";
+import { useAuth } from "@/lib/auth-context";
 
 const nav = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -19,20 +17,13 @@ const nav = [
 export function AppShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const [empresas, setEmpresas] = useState<Empresa[]>([]);
-  const [empresa, setEmp] = useState<Empresa | null>(null);
-  const [user, setU] = useState<{ nome: string; email: string } | null>(null);
+  const { user, empresas, empresaAtiva, lojaAtiva, setEmpresaAtiva, setLojaAtiva, signOut, loading } = useAuth();
 
   useEffect(() => {
-    const u = getUser();
-    setU(u);
-    setEmp(getEmpresa());
-    listarEmpresas().then(setEmpresas);
-    if (!u) router.navigate({ to: "/login" });
-  }, [router]);
+    if (!loading && !user) router.navigate({ to: "/login" });
+  }, [user, loading, router]);
 
-  function trocarEmpresa(e: Empresa) { setEmpresa(e); setEmp(e); }
-  function logout() { clearSession(); router.navigate({ to: "/login" }); }
+  async function logout() { await signOut(); router.navigate({ to: "/login" }); }
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -70,27 +61,54 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex items-center justify-between gap-4 border-b bg-card px-6 py-3">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2">
-                <span className="h-2 w-2 rounded-full bg-primary" />
-                <span className="max-w-[220px] truncate">{empresa?.nome ?? "Selecionar empresa"}</span>
-                <ChevronDown className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-72">
-              <DropdownMenuLabel>Empresas / Lojas</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {empresas.map((e) => (
-                <DropdownMenuItem key={e.id} onClick={() => trocarEmpresa(e)}>
-                  <div>
-                    <p className="text-sm font-medium">{e.nome}</p>
-                    <p className="text-xs text-muted-foreground">empId {e.empId} • {e.statusConexao}</p>
-                  </div>
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2">
+                  <span className="h-2 w-2 rounded-full bg-primary" />
+                  <span className="max-w-[220px] truncate">{empresaAtiva?.nome_fantasia ?? "Empresa"}</span>
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-72">
+                <DropdownMenuLabel>Empresas</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {empresas.length === 0 && (
+                  <p className="px-2 py-2 text-xs text-muted-foreground">Nenhuma empresa vinculada</p>
+                )}
+                {empresas.map((e) => (
+                  <DropdownMenuItem key={e.id} onClick={() => setEmpresaAtiva(e.id)}>
+                    <div>
+                      <p className="text-sm font-medium">{e.nome_fantasia}</p>
+                      <p className="text-xs text-muted-foreground">{e.lojas.length} loja(s) • {e.role_na_empresa}</p>
+                    </div>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            {empresaAtiva && empresaAtiva.lojas.length > 0 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-2">
+                    <span className="max-w-[200px] truncate">{lojaAtiva?.nome ?? "Loja"}</span>
+                    <ChevronDown className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-64">
+                  <DropdownMenuLabel>Lojas</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {empresaAtiva.lojas.map((l) => (
+                    <DropdownMenuItem key={l.id} onClick={() => setLojaAtiva(l.id)}>
+                      <div>
+                        <p className="text-sm font-medium">{l.nome}</p>
+                        <p className="text-xs text-muted-foreground">empId {l.emp_id_maxdata} • term {l.terminal_maxdata}</p>
+                      </div>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -100,7 +118,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 </div>
                 <div className="hidden text-left sm:block">
                   <p className="text-sm font-medium leading-tight">{user?.nome ?? "Usuário"}</p>
-                  <p className="text-xs text-muted-foreground leading-tight">{user?.email ?? ""}</p>
+                  <p className="text-xs text-muted-foreground leading-tight">{user?.email ?? ""} • {user?.role ?? ""}</p>
                 </div>
               </Button>
             </DropdownMenuTrigger>
