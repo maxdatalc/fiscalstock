@@ -4,13 +4,15 @@ import { AppShell } from "@/components/AppShell";
 import { ProductSearch } from "@/components/ProductSearch";
 import { StockComparisonCard } from "@/components/StockComparisonCard";
 import { FiscalPhysicalBadge } from "@/components/FiscalPhysicalBadge";
+import { RequireLoja } from "@/components/RequireLoja";
+import { IntegrationStatusBanner } from "@/components/IntegrationStatusBanner";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Package, AlertTriangle, Ban, ClipboardList } from "lucide-react";
-import { listarProdutos } from "@/lib/services/stock.service";
-import { listarOrdens } from "@/lib/services/service-order.service";
+import { stockService } from "@/lib/services/stock-adapter";
+import { serviceOrderService } from "@/lib/services/service-order-adapter";
 import { calcularStatusFiscal, type Produto } from "@/lib/types";
-import { getEmpresa } from "@/lib/session";
+import { useAuth } from "@/lib/auth-context";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — FiscalStock MaxData" }] }),
@@ -18,15 +20,32 @@ export const Route = createFileRoute("/dashboard")({
 });
 
 function Dashboard() {
+  return (
+    <AppShell>
+      <RequireLoja>
+        <DashboardContent />
+      </RequireLoja>
+    </AppShell>
+  );
+}
+
+function DashboardContent() {
+  const { lojaAtiva, empresaAtiva } = useAuth();
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [busca, setBusca] = useState("");
   const [osAbertas, setOsAbertas] = useState(0);
-  const empresa = typeof window !== "undefined" ? getEmpresa() : null;
 
+  // TODO CLAUDE:
+  // substituir este adapter pelo ServerStockService real assim que a Bridge SQL
+  // estiver disponível com queryName + params seguros. Respeitar lojaAtiva.emp_id_maxdata.
   useEffect(() => {
-    listarProdutos(empresa?.id, busca).then(setProdutos);
-    listarOrdens(empresa?.id).then((o) => setOsAbertas(o.filter((x) => x.status === "aberta" || x.status === "em_andamento").length));
-  }, [busca, empresa?.id]);
+    if (!lojaAtiva) return;
+    stockService.search(lojaAtiva.id, busca).then(setProdutos).catch(console.error);
+    serviceOrderService
+      .list(lojaAtiva.id)
+      .then((o) => setOsAbertas(o.filter((x) => x.status === "aberta" || x.status === "em_andamento").length))
+      .catch(console.error);
+  }, [busca, lojaAtiva?.id]);
 
   const stats = useMemo(() => {
     const fiscalMenor = produtos.filter((p) => p.estoqueFiscal < p.estoqueFisico).length;
@@ -35,23 +54,24 @@ function Dashboard() {
   }, [produtos]);
 
   return (
-    <AppShell>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-semibold">Dashboard</h1>
-          <p className="text-sm text-muted-foreground">
-            Visão consolidada do estoque físico vs. fiscal {empresa ? `— ${empresa.nome}` : ""}
-          </p>
-        </div>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold">Dashboard</h1>
+        <p className="text-sm text-muted-foreground">
+          Visão consolidada do estoque físico vs. fiscal — {empresaAtiva?.nome_fantasia} / {lojaAtiva?.nome}
+        </p>
+      </div>
 
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <IntegrationStatusBanner />
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <StockComparisonCard label="Produtos consultados" value={stats.total} icon={<Package className="h-4 w-4" />} />
           <StockComparisonCard label="Fiscal menor que físico" value={stats.fiscalMenor} tone="warning" icon={<AlertTriangle className="h-4 w-4" />} />
           <StockComparisonCard label="Sem saldo fiscal" value={stats.semFiscal} tone="danger" icon={<Ban className="h-4 w-4" />} />
           <StockComparisonCard label="O.S abertas" value={osAbertas} tone="primary" icon={<ClipboardList className="h-4 w-4" />} />
-        </div>
+      </div>
 
-        <div className="rounded-lg border bg-card p-5">
+      <div className="rounded-lg border bg-card p-5">
           <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <h2 className="text-base font-semibold">Produtos</h2>
             <div className="md:w-96">
@@ -102,8 +122,7 @@ function Dashboard() {
               </TableBody>
             </Table>
           </div>
-        </div>
       </div>
-    </AppShell>
+    </div>
   );
 }
