@@ -142,16 +142,14 @@ export const upsertIntegrationConfig = createServerFn({ method: "POST" })
     if (!ok) throw new Error("Apenas owner/admin pode editar a integração.");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const payload: Record<string, unknown> = {
+    const includeSecret = !!(data.maxapi_secret_key && data.maxapi_secret_key.trim().length > 0);
+    const payload = {
       loja_id: data.loja_id,
       bridge_url: data.bridge_url ?? null,
       maxapi_url: data.maxapi_url ?? null,
       maxapi_client_id: data.maxapi_client_id ?? null,
+      ...(includeSecret ? { maxapi_secret_key: data.maxapi_secret_key! } : {}),
     };
-    // Só atualiza o secret se veio um valor não vazio (preserva o existente).
-    if (data.maxapi_secret_key && data.maxapi_secret_key.trim().length > 0) {
-      payload.maxapi_secret_key = data.maxapi_secret_key;
-    }
 
     const { error } = await supabaseAdmin
       .from("integration_configs")
