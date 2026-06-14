@@ -1,0 +1,253 @@
+/**
+ * Named query registry — server-side only.
+ *
+ * SQL is hardcoded here; the frontend only ever sends a `queryName` string
+ * plus typed params. This prevents SQL injection and free-query attacks.
+ *
+ * All SQL targets the BATAUTO (MaxData) SQL Server via the Bridge proxy.
+ * Parameters use SQL Server @name syntax.
+ *
+ * Schema validated against BATAUTO on 2026-06-14 — see docs/maxdata-fiscal-stock-research.md.
+ */
+
+// ---------------------------------------------------------------------------
+// Query 1 — SEARCH_PRODUCTS
+// ---------------------------------------------------------------------------
+const SEARCH_PRODUCTS = `
+SELECT TOP 30
+  p.proId         AS proId,
+  p.proCodigo     AS proCodigo,
+  p.proDescricao  AS proDescricao,
+  p.proEstoqueAtual AS proEstoqueAtual,
+  p.proUn         AS proUn
+FROM produto p
+INNER JOIN produto_empresa pe ON pe.proId = p.proId AND pe.empId = @empId
+WHERE
+  p.proStatus <> 'I'
+  AND (
+       p.proDescricao LIKE @termo
+    OR p.proCodigo    LIKE @termo
+  )
+ORDER BY p.proDescricao
+`;
+
+// ---------------------------------------------------------------------------
+// Query 2 — GET_PRODUCT_PHYSICAL_STOCK
+// ---------------------------------------------------------------------------
+const GET_PRODUCT_PHYSICAL_STOCK = `
+SELECT
+  p.proId         AS proId,
+  p.proCodigo     AS proCodigo,
+  p.proDescricao  AS proDescricao,
+  p.proEstoqueAtual AS proEstoqueAtual,
+  p.proUn         AS proUn
+FROM produto p
+INNER JOIN produto_empresa pe ON pe.proId = p.proId AND pe.empId = @empId
+WHERE p.proId = @proId
+`;
+
+// ---------------------------------------------------------------------------
+// Query 3 — GET_FISCAL_STOCK_COMPOSITION
+// Calculates fiscal stock using the validated formula (research doc §8).
+// Formula: InventarioBase + Entradas(E) + Devoluções(1202/2202) - Saídas(S) + Ajustes
+// ---------------------------------------------------------------------------
+const GET_FISCAL_STOCK_COMPOSITION = `
+WITH InventarioBase AS (
+  SELECT TOP 1
+    ii.iviProId       AS proId,
+    ii.iviProEstoque  AS baseInv,
+    i.invId,
+    i.invData         AS dataInventario,
+    i.empId
+  FROM InventarioItem ii
+  INNER JOIN Inventario i ON i.invId = ii.iviInvId
+  WHERE ii.iviProId  = @proId
+    AND i.empId      = @empId
+    AND i.invSuspenso = 0
+  ORDER BY i.invData DESC
+),
+Entradas AS (
+  SELECT COALESCE(SUM(ni.nfiQtde), 0) AS total
+  FROM nfItem ni
+  INNER JOIN nf n ON n.nfId = ni.nfiNf
+  CROSS JOIN InventarioBase ib
+  WHERE ni.nfiProd      = @proId
+    AND n.empId         = @empId
+    AND n.nfStatus      = 'F'
+    AND n.nfTipoNf      = 'E'
+    AND ni.nfiCfop NOT IN (1202, 2202, 5202, 6202)
+    AND n.nfDataEmissao > ib.dataInventario
+),
+Saidas AS (
+  SELECT COALESCE(SUM(ni.nfiQtde), 0) AS total
+  FROM nfItem ni
+  INNER JOIN nf n ON n.nfId = ni.nfiNf
+  CROSS JOIN InventarioBase ib
+  WHERE ni.nfiProd      = @proId
+    AND n.empId         = @empId
+    AND n.nfStatus      = 'F'
+    AND n.nfTipoNf      = 'S'
+    AND n.nfDataEmissao > ib.dataInventario
+),
+Devolucoes AS (
+  SELECT COALESCE(SUM(ni.nfiQtde), 0) AS total
+  FROM nfItem ni
+  INNER JOIN nf n ON n.nfId = ni.nfiNf
+  CROSS JOIN InventarioBase ib
+  WHERE ni.nfiProd      = @proId
+    AND n.empId         = @empId
+    AND n.nfStatus      = 'F'
+    AND ni.nfiCfop      IN (1202, 2202)
+    AND n.nfDataEmissao > ib.dataInventario
+),
+Ajustes AS (
+  SELECT COALESCE(SUM(pai.paiQtdInf - pai.paiProEstoque), 0) AS total
+  FROM produtoAcertoEstoque pae
+  INNER JOIN produtoAcertoEstoqueItem pai ON pai.paiPaeId = pae.paeId
+  CROSS JOIN InventarioBase ib
+  WHERE pai.paiProId           = @proId
+    AND pae.empId              = @empId
+    AND pae.paeStatus          = 'F'
+    AND pae.paeDataOcorrencia  > ib.dataInventario
+)
+SELECT
+  ib.proId              AS proId,
+  ib.empId              AS empId,
+  ib.invId              AS inventarioId,
+  CONVERT(VARCHAR(23), ib.dataInventario, 126) AS dataInventario,
+  ib.baseInv            AS estoqueBaseInventario,
+  e.total               AS entradasFiscais,
+  s.total               AS saidasFiscais,
+  d.total               AS devolucoesFiscais,
+  aj.total              AS ajustesEstoque,
+  (ib.baseInv + e.total - s.total + d.total + aj.total) AS estoqueFiscal
+FROM InventarioBase ib
+CROSS JOIN Entradas e
+CROSS JOIN Saidas s
+CROSS JOIN Devolucoes d
+CROSS JOIN Ajustes aj
+`;
+
+// ---------------------------------------------------------------------------
+// Query 4 — LIST_OPEN_SERVICE_ORDERS
+// Reads from venda (OS type, open status) with client name.
+// ---------------------------------------------------------------------------
+const LIST_OPEN_SERVICE_ORDERS = `
+SELECT TOP 50
+  v.vedId              AS vedId,
+  v.vedNum             AS vedNum,
+  COALESCE(c.cliNome, v.vedNomeDest) AS clienteNome,
+  v.vedPlaca           AS placa,
+  v.vedStatus          AS status,
+  CONVERT(VARCHAR(23), v.vedDataEmissao, 126) AS dataAbertura,
+  v.vedObs             AS obs,
+  v.vedDefeitoRecl     AS defeito
+FROM venda v
+LEFT JOIN cliente c ON c.cliId = v.vedCliId
+WHERE v.empId    = @empId
+  AND v.vedTipo  = 'OS'
+  AND v.vedStatus = 'A'
+ORDER BY v.vedDataEmissao DESC
+`;
+
+// ---------------------------------------------------------------------------
+// Query 5 — GET_SERVICE_ORDER_DETAIL
+// ---------------------------------------------------------------------------
+const GET_SERVICE_ORDER_DETAIL = `
+SELECT
+  v.vedId              AS vedId,
+  v.vedNum             AS vedNum,
+  v.vedCliId           AS clienteId,
+  COALESCE(c.cliNome, v.vedNomeDest) AS clienteNome,
+  v.vedPlaca           AS placa,
+  v.vedStatus          AS status,
+  CONVERT(VARCHAR(23), v.vedDataEmissao, 126) AS dataAbertura,
+  v.vedObs             AS obs,
+  v.vedDefeitoRecl     AS defeito,
+  v.vedLaudoTec        AS laudoTec
+FROM venda v
+LEFT JOIN cliente c ON c.cliId = v.vedCliId
+WHERE v.vedId = @osId
+  AND v.empId  = @empId
+  AND v.vedTipo = 'OS'
+`;
+
+// ---------------------------------------------------------------------------
+// Query 6 — GET_SERVICE_ORDER_ITEMS
+// ---------------------------------------------------------------------------
+const GET_SERVICE_ORDER_ITEMS = `
+SELECT
+  vdi.vdiId            AS itemId,
+  vdi.vdiItemId        AS proId,
+  p.proCodigo          AS proCodigo,
+  p.proDescricao       AS proDescricao,
+  p.proUn              AS proUn,
+  vdi.vdiQtde          AS qtde,
+  vdi.vdiPreco         AS precoUnitario,
+  (vdi.vdiQtde * vdi.vdiPreco) AS totalItem,
+  vdi.vdiCancel        AS cancelado
+FROM vendaItem vdi
+INNER JOIN produto p ON p.proId = vdi.vdiItemId
+WHERE vdi.vdiVedId = @osId
+  AND vdi.vdiCancel = 0
+ORDER BY vdi.vdiId
+`;
+
+// ---------------------------------------------------------------------------
+// Registry — maps queryName → { sql, allowedParams }
+// Only keys listed here are callable from server functions.
+// ---------------------------------------------------------------------------
+
+type QueryDef = {
+  sql: string;
+  allowedParams: string[];
+};
+
+const REGISTRY: Record<string, QueryDef> = {
+  SEARCH_PRODUCTS: {
+    sql: SEARCH_PRODUCTS,
+    allowedParams: ["empId", "termo"],
+  },
+  GET_PRODUCT_PHYSICAL_STOCK: {
+    sql: GET_PRODUCT_PHYSICAL_STOCK,
+    allowedParams: ["empId", "proId"],
+  },
+  GET_FISCAL_STOCK_COMPOSITION: {
+    sql: GET_FISCAL_STOCK_COMPOSITION,
+    allowedParams: ["empId", "proId"],
+  },
+  LIST_OPEN_SERVICE_ORDERS: {
+    sql: LIST_OPEN_SERVICE_ORDERS,
+    allowedParams: ["empId"],
+  },
+  GET_SERVICE_ORDER_DETAIL: {
+    sql: GET_SERVICE_ORDER_DETAIL,
+    allowedParams: ["empId", "osId"],
+  },
+  GET_SERVICE_ORDER_ITEMS: {
+    sql: GET_SERVICE_ORDER_ITEMS,
+    allowedParams: ["osId"],
+  },
+};
+
+export type NamedQueryKey = keyof typeof REGISTRY;
+
+/**
+ * Resolve a named query to its SQL + validated params.
+ * Strips any params not in the allowedParams list (defense in depth).
+ * Throws if the query name is not registered.
+ */
+export function resolveNamedQuery(
+  queryName: NamedQueryKey,
+  rawParams: Record<string, unknown>,
+): { sql: string; params: Record<string, unknown> } {
+  const def = REGISTRY[queryName];
+  if (!def) {
+    throw new Error(`Named query desconhecida: "${String(queryName)}"`);
+  }
+  const params: Record<string, unknown> = {};
+  for (const key of def.allowedParams) {
+    if (key in rawParams) params[key] = rawParams[key];
+  }
+  return { sql: def.sql, params };
+}
