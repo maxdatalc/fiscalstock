@@ -79,14 +79,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
+      { title: "FiscalStock Maxdata" },
+      { name: "description", content: "Fiscal Stock Guard helps MaxData ERP users compare physical and fiscal stock before issuing documents." },
       { name: "author", content: "MaxData" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { property: "og:title", content: "FiscalStock Maxdata" },
+      { property: "og:description", content: "Fiscal Stock Guard helps MaxData ERP users compare physical and fiscal stock before issuing documents." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "FiscalStock Maxdata" },
+      { name: "twitter:description", content: "Fiscal Stock Guard helps MaxData ERP users compare physical and fiscal stock before issuing documents." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/38dc029c-ea06-4c65-98f7-e1301863453f/id-preview-f24934cc--2f3e7c35-39ea-4854-a5ab-3b732e481b77.lovable.app-1781467928784.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/38dc029c-ea06-4c65-98f7-e1301863453f/id-preview-f24934cc--2f3e7c35-39ea-4854-a5ab-3b732e481b77.lovable.app-1781467928784.png" },
     ],
     links: [
       {
