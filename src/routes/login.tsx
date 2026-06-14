@@ -15,7 +15,7 @@ export const Route = createFileRoute("/login")({
 
 function LoginPage() {
   const router = useRouter();
-  const { user, empresas, setEmpresaAtiva, refresh } = useAuth();
+  const { user, empresas, isGlobalAdmin, setEmpresaAtiva, refresh } = useAuth();
   const [email, setEmail] = useState("admin@maxdata.com.br");
   const [senha, setSenha] = useState("");
   const [mode, setMode] = useState<"signin" | "signup">("signin");
@@ -54,7 +54,7 @@ function LoginPage() {
     router.navigate({ to: "/dashboard" });
   }
 
-  const step: "login" | "empresa" = user && empresas.length > 0 ? "empresa" : "login";
+  const step: "login" | "empresa" = user ? "empresa" : "login";
 
   return (
     <div className="grid min-h-screen md:grid-cols-2">
@@ -131,9 +131,19 @@ function LoginPage() {
                   </button>
                 ))}
                 {empresas.length === 0 && (
-                  <p className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-                    Você ainda não está vinculado a nenhuma empresa. Peça a um administrador para vincular seu usuário.
-                  </p>
+                  <div className="space-y-3 rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+                    <p>
+                      Você ainda não está vinculado a nenhuma empresa.
+                      {isGlobalAdmin
+                        ? " Como administrador, você pode criar a primeira empresa agora."
+                        : " Peça a um administrador para vincular seu usuário."}
+                    </p>
+                    {isGlobalAdmin && (
+                      <Button className="w-full" onClick={() => router.navigate({ to: "/configuracoes" })}>
+                        Ir para Configurações
+                      </Button>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
