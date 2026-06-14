@@ -17,10 +17,15 @@ import {
   listEmpresasAdmin, createEmpresa,
   listLojasAdmin, createLoja,
   listUserEmpresas,
-  upsertIntegrationConfig,
   listAuditLogs,
 } from "@/lib/api/admin.functions";
-import { getIntegrationStatus, testBridgeConnection, testMaxApiConnection } from "@/lib/api/integrations.functions";
+import {
+  getIntegrationStatus,
+  getIntegrationConfig,
+  saveIntegrationConfig,
+  testBridgeConnection,
+  testMaxApiConnection,
+} from "@/lib/api/integrations.functions";
 
 export const Route = createFileRoute("/configuracoes")({
   head: () => ({ meta: [{ title: "Configurações — FiscalStock" }] }),
@@ -197,23 +202,37 @@ function LojasTab({ canEdit }: { canEdit: boolean }) {
 function IntegracoesTab({ canEdit }: { canEdit: boolean }) {
   const { lojaAtiva, empresaAtiva } = useAuth();
   const fetchStatus = useServerFn(getIntegrationStatus);
-  const upsert = useServerFn(upsertIntegrationConfig);
+  const fetchConfig = useServerFn(getIntegrationConfig);
+  const save = useServerFn(saveIntegrationConfig);
   const testBridge = useServerFn(testBridgeConnection);
   const testMax = useServerFn(testMaxApiConnection);
 
   const [bridgeUrl, setBridgeUrl] = useState("");
+  const [bridgeToken, setBridgeToken] = useState("");
+  const [tokenConfigurado, setTokenConfigurado] = useState(false);
   const [maxUrl, setMaxUrl] = useState("");
-  const [clientId, setClientId] = useState("");
-  const [secret, setSecret] = useState(""); // sempre vazio na carga: máscara
+  const [empId, setEmpId] = useState("");
+  const [terminal, setTerminal] = useState("");
   const [info, setInfo] = useState<Awaited<ReturnType<typeof fetchStatus>> | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [bridgeResult, setBridgeResult] = useState<{ status: string; mensagem: string } | null>(null);
+  const [maxResult, setMaxResult] = useState<{ status: string; mensagem: string } | null>(null);
 
   async function reload() {
     if (!lojaAtiva) return;
-    const r = await fetchStatus({ data: { loja_id: lojaAtiva.id } });
-    setInfo(r);
-    // Não preenchemos URLs/IDs do servidor por segurança operacional: o usuário re-digita
-    // ao salvar. (Tokens/segredos nunca vêm pro front.)
-    setBridgeUrl(""); setMaxUrl(""); setClientId(""); setSecret("");
+    try {
+      const [status, cfg] = await Promise.all([
+        fetchStatus({ data: { loja_id: lojaAtiva.id } }),
+        fetchConfig({ data: { loja_id: lojaAtiva.id } }),
+      ]);
+      setInfo(status);
+      setBridgeUrl(cfg?.bridge_url ?? "");
+      setMaxUrl(cfg?.maxapi_url ?? "");
+      setEmpId(cfg?.emp_id_maxdata ?? "");
+      setTerminal(cfg?.terminal_maxdata ?? "");
+      setTokenConfigurado(!!cfg?.bridge_token_configurado);
+      setBridgeToken("");
+    } catch (e) { console.error(e); }
   }
   useEffect(() => { void reload(); /* eslint-disable-next-line */ }, [lojaAtiva?.id]);
 
@@ -221,26 +240,38 @@ function IntegracoesTab({ canEdit }: { canEdit: boolean }) {
     return <Card><CardContent className="p-6 text-sm text-muted-foreground">Selecione uma loja no topo para configurar integrações.</CardContent></Card>;
   }
 
-  async function save() {
+  async function handleSave() {
+    setSaving(true);
+    setBridgeResult(null); setMaxResult(null);
     try {
-      await upsert({ data: {
+      await save({ data: {
         loja_id: lojaAtiva!.id,
-        bridge_url: bridgeUrl || null,
-        maxapi_url: maxUrl || null,
-        maxapi_client_id: clientId || null,
-        maxapi_secret_key: secret || null, // vazio => não sobrescreve
+        bridge_url: bridgeUrl || undefined,
+        bridge_token: bridgeToken || undefined,
+        maxapi_url: maxUrl || undefined,
+        emp_id_maxdata: empId || undefined,
+        terminal_maxdata: terminal || undefined,
       } });
-      toast.success("Configuração salva.");
+      toast.success("Configuração salva. Testando conexões…");
+      const [b, m] = await Promise.all([
+        testBridge({ data: { loja_id: lojaAtiva!.id } }).catch((e) => ({ status: "erro", mensagem: (e as Error).message })),
+        testMax({ data: { loja_id: lojaAtiva!.id } }).catch((e) => ({ status: "erro", mensagem: (e as Error).message })),
+      ]);
+      setBridgeResult(b);
+      setMaxResult(m);
       void reload();
     } catch (e) { toast.error((e as Error).message); }
+    finally { setSaving(false); }
   }
   async function runBridge() {
     const r = await testBridge({ data: { loja_id: lojaAtiva!.id } });
+    setBridgeResult(r);
     toast[r.status === "online" ? "success" : "error"](r.mensagem);
     void reload();
   }
   async function runMax() {
     const r = await testMax({ data: { loja_id: lojaAtiva!.id } });
+    setMaxResult(r);
     toast[r.status === "online" ? "success" : "error"](r.mensagem);
     void reload();
   }
@@ -252,33 +283,90 @@ function IntegracoesTab({ canEdit }: { canEdit: boolean }) {
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-xs text-muted-foreground">
-          Segredos (secret_key, tokens) nunca aparecem no frontend. Para alterar o secret,
+          Tokens nunca aparecem no frontend. Para alterar o token da Bridge,
           digite um valor novo. Deixe vazio para preservar o atual.
         </p>
 
         <div className="grid gap-2 md:grid-cols-2">
           <div className="rounded border p-3">
             <p className="text-xs text-muted-foreground">Bridge SQL</p>
-            <p className="text-sm font-medium">{info?.bridge_configurada ? "Configurada" : "Não configurada"} • {info?.status_bridge ?? "—"}</p>
+            <div className="flex items-center gap-2">
+              <Badge variant={info?.status_bridge === "online" ? "default" : "outline"}>
+                {info?.status_bridge ?? "—"}
+              </Badge>
+              <span className="text-xs text-muted-foreground">
+                {info?.bridge_configurada ? "configurada" : "não configurada"}
+              </span>
+            </div>
           </div>
           <div className="rounded border p-3">
             <p className="text-xs text-muted-foreground">MaxAPI</p>
-            <p className="text-sm font-medium">{info?.maxapi_configurada ? "Configurada" : "Não configurada"} • {info?.status_maxapi ?? "—"}</p>
+            <div className="flex items-center gap-2">
+              <Badge variant={info?.status_maxapi === "online" ? "default" : "outline"}>
+                {info?.status_maxapi ?? "—"}
+              </Badge>
+              <span className="text-xs text-muted-foreground">
+                {info?.maxapi_configurada ? "configurada" : "não configurada"}
+              </span>
+            </div>
           </div>
         </div>
 
         <fieldset disabled={!canEdit} className="space-y-3 disabled:opacity-60">
-          <div><Label>Bridge SQL URL</Label><Input value={bridgeUrl} onChange={(e) => setBridgeUrl(e.target.value)} placeholder="https://bridge.cliente.local/sql" /></div>
-          <div className="grid gap-3 md:grid-cols-3">
-            <div><Label>MaxAPI URL</Label><Input value={maxUrl} onChange={(e) => setMaxUrl(e.target.value)} placeholder="https://maxapi.cliente.local" /></div>
-            <div><Label>MaxAPI Client ID</Label><Input value={clientId} onChange={(e) => setClientId(e.target.value)} /></div>
-            <div><Label>MaxAPI Secret Key</Label><Input type="password" value={secret} onChange={(e) => setSecret(e.target.value)} placeholder="••••••••••" /></div>
+          <div>
+            <Label>URL da Bridge SQL</Label>
+            <Input value={bridgeUrl} onChange={(e) => setBridgeUrl(e.target.value)} placeholder="https://bridge.cliente.local" />
+          </div>
+          <div>
+            <div className="flex items-center justify-between">
+              <Label>Token da Bridge</Label>
+              {tokenConfigurado && (
+                <span className="text-xs font-medium text-[color:oklch(0.55_0.15_150)]">
+                  ✓ Token já configurado
+                </span>
+              )}
+            </div>
+            <Input
+              type="password"
+              value={bridgeToken}
+              onChange={(e) => setBridgeToken(e.target.value)}
+              placeholder={tokenConfigurado ? "••••••• (deixe vazio para não alterar)" : "Cole o token"}
+              autoComplete="new-password"
+            />
+          </div>
+          <div>
+            <Label>URL da MaxAPI</Label>
+            <Input value={maxUrl} onChange={(e) => setMaxUrl(e.target.value)} placeholder="https://maxapi.cliente.local" />
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            <div><Label>EmpID MaxData</Label><Input value={empId} onChange={(e) => setEmpId(e.target.value)} placeholder="1" /></div>
+            <div><Label>Terminal MaxData</Label><Input value={terminal} onChange={(e) => setTerminal(e.target.value)} placeholder="36E1123..." /></div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button onClick={save} disabled={!canEdit}>Salvar</Button>
+            <Button onClick={handleSave} disabled={!canEdit || saving}>
+              {saving ? "Salvando…" : "Salvar e testar"}
+            </Button>
             <Button variant="outline" onClick={runBridge} disabled={!canEdit}><RefreshCw className="mr-1 h-3.5 w-3.5" /> Testar Bridge</Button>
             <Button variant="outline" onClick={runMax} disabled={!canEdit}><RefreshCw className="mr-1 h-3.5 w-3.5" /> Testar MaxAPI</Button>
           </div>
+          {(bridgeResult || maxResult) && (
+            <div className="space-y-2 rounded border bg-muted/30 p-3 text-xs">
+              {bridgeResult && (
+                <p>
+                  <span className="font-semibold">Bridge:</span>{" "}
+                  <Badge variant={bridgeResult.status === "online" ? "default" : "outline"} className="mr-1">{bridgeResult.status}</Badge>
+                  {bridgeResult.mensagem}
+                </p>
+              )}
+              {maxResult && (
+                <p>
+                  <span className="font-semibold">MaxAPI:</span>{" "}
+                  <Badge variant={maxResult.status === "online" ? "default" : "outline"} className="mr-1">{maxResult.status}</Badge>
+                  {maxResult.mensagem}
+                </p>
+              )}
+            </div>
+          )}
         </fieldset>
       </CardContent>
     </Card>
