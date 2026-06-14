@@ -3,11 +3,14 @@ import { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { StockComparisonCard } from "@/components/StockComparisonCard";
 import { FiscalPhysicalBadge } from "@/components/FiscalPhysicalBadge";
+import { RequireLoja } from "@/components/RequireLoja";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { AlertTriangle, ChevronLeft, Plus } from "lucide-react";
-import { buscarProduto } from "@/lib/services/stock.service";
-import { calcularStatusFiscal, disponivelParaEmissao, type Produto } from "@/lib/types";
+import { stockService } from "@/lib/services/stock-adapter";
+import type { ProductStockDetail } from "@/lib/api/stock.functions";
+import { useAuth } from "@/lib/auth-context";
 
 export const Route = createFileRoute("/produto/$id")({
   head: () => ({ meta: [{ title: "Detalhe do produto — FiscalStock" }] }),
@@ -15,26 +18,40 @@ export const Route = createFileRoute("/produto/$id")({
 });
 
 function ProdutoDetalhe() {
-  const { id } = Route.useParams();
-  const router = useRouter();
-  const [p, setP] = useState<Produto | null>(null);
-
-  useEffect(() => { buscarProduto(id).then(setP); }, [id]);
-
-  if (!p) return <AppShell><p className="text-sm text-muted-foreground">Carregando...</p></AppShell>;
-
-  const status = calcularStatusFiscal(p);
-  const disp = disponivelParaEmissao(p);
-  const dif = p.estoqueFisico - p.estoqueFiscal;
-  const c = p.composicaoFiscal;
-
-  const riscos: { tipo: "danger" | "warning"; msg: string }[] = [];
-  if (p.estoqueFisico > p.estoqueFiscal) riscos.push({ tipo: "warning", msg: `Estoque físico (${p.estoqueFisico}) é maior que o fiscal (${p.estoqueFiscal}). Risco de emitir sem cobertura fiscal.` });
-  if (p.estoqueFiscal <= 0) riscos.push({ tipo: "danger", msg: "Estoque fiscal zerado ou negativo. Não é possível emitir nota fiscalmente." });
-  if (p.reservadoEmOS > 0) riscos.push({ tipo: "warning", msg: `Existem ${p.reservadoEmOS} unidade(s) reservadas em O.S aberta.` });
-
   return (
     <AppShell>
+      <RequireLoja>
+        <ProdutoDetalheContent />
+      </RequireLoja>
+    </AppShell>
+  );
+}
+
+function ProdutoDetalheContent() {
+  const { id } = Route.useParams();
+  const router = useRouter();
+  const { lojaAtiva } = useAuth();
+  const [d, setD] = useState<ProductStockDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // TODO CLAUDE:
+  // substituir este mock por chamada real à Bridge SQL usando queryName + params.
+  // não usar SQL livre. respeitar lojaAtiva.emp_id_maxdata.
+  useEffect(() => {
+    if (!lojaAtiva) return;
+    setLoading(true);
+    stockService.detail(lojaAtiva.id, id).then((r) => { setD(r); setLoading(false); }).catch((e) => {
+      console.error(e); setLoading(false);
+    });
+  }, [id, lojaAtiva?.id]);
+
+  if (loading) return <p className="text-sm text-muted-foreground">Carregando…</p>;
+  if (!d) return <p className="text-sm text-muted-foreground">Produto não encontrado nesta loja.</p>;
+
+  const p = d.produto;
+  const c = d.composicao_estoque_fiscal;
+
+  return (
       <div className="space-y-6">
         <Button variant="ghost" size="sm" onClick={() => router.history.back()} className="-ml-3">
           <ChevronLeft className="mr-1 h-4 w-4" /> Voltar
@@ -46,7 +63,7 @@ function ProdutoDetalhe() {
             <p className="mt-1 text-sm text-muted-foreground">
               Código <span className="font-mono">{p.codigo}</span> • EAN <span className="font-mono">{p.codigoBarras}</span> • Unidade {p.unidade}
             </p>
-            <div className="mt-2"><FiscalPhysicalBadge status={status} /></div>
+            <div className="mt-2"><FiscalPhysicalBadge status={d.status_risco} /></div>
           </div>
           <Button asChild>
             <Link to="/ordens"><Plus className="mr-1 h-4 w-4" /> Adicionar em O.S</Link>
@@ -54,25 +71,36 @@ function ProdutoDetalhe() {
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <StockComparisonCard label="Estoque físico" value={p.estoqueFisico} />
-          <StockComparisonCard label="Estoque fiscal" value={p.estoqueFiscal} tone={p.estoqueFiscal <= 0 ? "danger" : "default"} />
-          <StockComparisonCard label="Diferença físico × fiscal" value={dif > 0 ? `+${dif}` : dif} tone={dif > 0 ? "warning" : "default"} hint="Físico − Fiscal" />
-          <StockComparisonCard label="Disponível p/ emitir" value={disp} tone="primary" hint="Considera reservas em O.S" />
+          <StockComparisonCard label="Estoque físico" value={d.estoque_fisico} />
+          <StockComparisonCard label="Estoque fiscal" value={d.estoque_fiscal} tone={d.estoque_fiscal <= 0 ? "danger" : "default"} />
+          <StockComparisonCard label="Diferença físico × fiscal" value={d.diferenca > 0 ? `+${d.diferenca}` : d.diferenca} tone={d.diferenca > 0 ? "warning" : "default"} hint="Físico − Fiscal" />
+          <StockComparisonCard label="Disponível p/ emitir" value={d.disponivel_para_emissao} tone="primary" hint="Considera reservas em O.S" />
         </div>
 
         <div className="grid gap-6 lg:grid-cols-2">
           <Card>
-            <CardHeader><CardTitle className="text-base">Composição do estoque fiscal</CardTitle></CardHeader>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base">Composição do estoque fiscal</CardTitle>
+                <Badge variant="outline" className="border-[color:var(--warning)]/40 text-[color:oklch(0.45_0.15_70)]">
+                  Simulado • aguardando mapeamento SQL
+                </Badge>
+              </div>
+            </CardHeader>
             <CardContent>
+              <p className="mb-3 text-xs text-muted-foreground">
+                ⚠️ Os valores abaixo são <strong>simulados</strong>. A fórmula fiscal definitiva
+                será validada pelo Claude Code junto ao MaxManager.
+              </p>
               <dl className="divide-y text-sm">
-                <Row label="Inventário fiscal base" v={c.inventarioBase} />
+                <Row label="Inventário fiscal base" v={c.inventario_base} />
                 <Row label="(+) Entradas fiscais" v={c.entradas} tone="success" />
                 <Row label="(−) Saídas fiscais" v={-c.saidas} tone="danger" />
                 <Row label="(+) Devoluções" v={c.devolucoes} tone="success" />
                 <Row label="(±) Ajustes fiscais" v={c.ajustes} />
                 <div className="flex items-center justify-between pt-3 font-semibold">
                   <span>Saldo fiscal calculado</span>
-                  <span className="tabular-nums">{p.estoqueFiscal}</span>
+                  <span className="tabular-nums">{d.estoque_fiscal}</span>
                 </div>
               </dl>
             </CardContent>
@@ -81,24 +109,23 @@ function ProdutoDetalhe() {
           <Card>
             <CardHeader><CardTitle className="text-base">Riscos</CardTitle></CardHeader>
             <CardContent className="space-y-2">
-              {riscos.length === 0 && (
+              {d.alertas.length === 0 && (
                 <p className="text-sm text-muted-foreground">Nenhum risco identificado para este item.</p>
               )}
-              {riscos.map((r, i) => (
+              {d.alertas.map((r, i) => (
                 <div key={i} className={`flex gap-2 rounded-md border p-3 text-sm ${
                   r.tipo === "danger"
                     ? "border-destructive/40 bg-destructive/5 text-destructive"
                     : "border-[color:var(--warning)]/40 bg-[color:var(--warning)]/10 text-[color:oklch(0.45_0.15_70)]"
                 }`}>
                   <AlertTriangle className="h-4 w-4 flex-shrink-0" />
-                  <p>{r.msg}</p>
+                  <p>{r.mensagem}</p>
                 </div>
               ))}
             </CardContent>
           </Card>
         </div>
       </div>
-    </AppShell>
   );
 }
 
