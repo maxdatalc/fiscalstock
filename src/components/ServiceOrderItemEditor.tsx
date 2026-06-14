@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { ProductSearch } from "./ProductSearch";
-import { listarProdutos } from "@/lib/services/stock.service";
+import { stockService } from "@/lib/services/stock-adapter";
 import { disponivelParaEmissao, type Produto } from "@/lib/types";
 import { AlertTriangle } from "lucide-react";
 
@@ -23,7 +23,8 @@ export function ServiceOrderItemEditor({
 
   useEffect(() => {
     if (!open) return;
-    listarProdutos(empresaId, busca).then(setProdutos);
+    // TODO CLAUDE: respeitar lojaAtiva; substituir por consulta real Bridge SQL.
+    stockService.search(empresaId, busca).then(setProdutos).catch(console.error);
   }, [busca, empresaId, open]);
 
   useEffect(() => {

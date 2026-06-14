@@ -2,12 +2,13 @@ import { createFileRoute, Outlet, useRouterState } from "@tanstack/react-router"
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { ServiceOrderList } from "@/components/ServiceOrderList";
+import { RequireLoja } from "@/components/RequireLoja";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus } from "lucide-react";
-import { listarOrdens } from "@/lib/services/service-order.service";
-import { getEmpresa } from "@/lib/session";
+import { serviceOrderService } from "@/lib/services/service-order-adapter";
+import { useAuth } from "@/lib/auth-context";
 import type { OrdemServico } from "@/lib/types";
 
 export const Route = createFileRoute("/ordens")({
@@ -22,13 +23,19 @@ function OrdensLayout() {
 }
 
 function OrdensIndex() {
+  const { lojaAtiva } = useAuth();
   const [ordens, setOrdens] = useState<OrdemServico[]>([]);
   const [cliente, setCliente] = useState("");
   const [placa, setPlaca] = useState("");
   const [status, setStatus] = useState<string>("todas");
-  const empresa = typeof window !== "undefined" ? getEmpresa() : null;
 
-  useEffect(() => { listarOrdens(empresa?.id).then(setOrdens); }, [empresa?.id]);
+  // TODO CLAUDE:
+  // substituir simulação por chamada real à MaxAPI.
+  // escritas em O.S. devem ser feitas somente pela MaxAPI, nunca via SQL direto.
+  useEffect(() => {
+    if (!lojaAtiva) return;
+    serviceOrderService.list(lojaAtiva.id).then(setOrdens).catch(console.error);
+  }, [lojaAtiva?.id]);
 
   const filtradas = ordens.filter((o) =>
     (cliente ? o.cliente.toLowerCase().includes(cliente.toLowerCase()) : true) &&
@@ -38,6 +45,7 @@ function OrdensIndex() {
 
   return (
     <AppShell>
+      <RequireLoja>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
@@ -65,6 +73,7 @@ function OrdensIndex() {
 
         <ServiceOrderList ordens={filtradas} />
       </div>
+      </RequireLoja>
     </AppShell>
   );
 }
