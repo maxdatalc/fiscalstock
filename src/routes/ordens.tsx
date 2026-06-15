@@ -25,7 +25,7 @@ function OrdensLayout() {
 function OrdensIndex() {
   const { lojaAtiva } = useAuth();
   const [ordens, setOrdens] = useState<OrdemServico[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [cliente, setCliente] = useState("");
   const [placa, setPlaca] = useState("");
   const [status, setStatus] = useState<string>("todas");

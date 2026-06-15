@@ -43,7 +43,6 @@ const AddItemInput = z.object({
 
 interface OsListRow {
   vedId: number;
-  vedNum: string | null;
   clienteNome: string | null;
   placa: string | null;
   status: string;
@@ -54,8 +53,17 @@ interface OsListRow {
   marca: string | null;
 }
 
-interface OsDetailRow extends OsListRow {
+interface OsDetailRow {
+  vedId: number;
   clienteId: number | null;
+  clienteNome: string | null;
+  placa: string | null;
+  status: string;
+  dataAbertura: string | null;
+  obs: string | null;
+  defeito: string | null;
+  equipamento: string | null;
+  marca: string | null;
   laudoTec: string | null;
 }
 
@@ -172,7 +180,7 @@ export const listServiceOrders = createServerFn({ method: "POST" })
 
     return rows.map((o) => ({
       id: String(o.vedId),
-      numero: o.vedNum ?? String(o.vedId),
+      numero: String(o.vedId),
       cliente: o.clienteNome ?? "",
       placa: o.placa ?? "",
       status: vedStatusToDisplay(o.status),
@@ -217,7 +225,7 @@ export const getServiceOrderDetail = createServerFn({ method: "POST" })
     const o = rows[0];
     return {
       id: String(o.vedId),
-      numero: o.vedNum ?? String(o.vedId),
+      numero: String(o.vedId),
       clienteId: o.clienteId ? String(o.clienteId) : null,
       cliente: o.clienteNome ?? "",
       placa: o.placa ?? "",

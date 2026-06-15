@@ -56,7 +56,7 @@ function OSDetailContent() {
   const router = useRouter();
   const { lojaAtiva } = useAuth();
   const [os, setOs] = useState<OrdemServico | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true); // true desde o inicio — skeleton aparece imediatamente
   const [open, setOpen] = useState(false);
   const [reload, setReload] = useState(0);
   const [confirmacao, setConfirmacao] = useState<
