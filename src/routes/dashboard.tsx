@@ -33,6 +33,7 @@ function DashboardContent() {
   const { lojaAtiva, empresaAtiva } = useAuth();
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [busca, setBusca] = useState("");
+  const [loadingProdutos, setLoadingProdutos] = useState(false);
   const [osAbertas, setOsAbertas] = useState(0);
 
   // TODO CLAUDE:
@@ -40,7 +41,11 @@ function DashboardContent() {
   // estiver disponível com queryName + params seguros. Respeitar lojaAtiva.emp_id_maxdata.
   useEffect(() => {
     if (!lojaAtiva) return;
-    stockService.search(lojaAtiva.id, busca).then(setProdutos).catch(console.error);
+    setLoadingProdutos(true);
+    stockService.search(lojaAtiva.id, busca)
+      .then(setProdutos)
+      .catch(console.error)
+      .finally(() => setLoadingProdutos(false));
     serviceOrderService
       .list(lojaAtiva.id)
       .then((o) => setOsAbertas(o.filter((x) => x.status === "aberta" || x.status === "em_andamento").length))
@@ -80,6 +85,19 @@ function DashboardContent() {
               <ProductSearch value={busca} onChange={setBusca} />
             </div>
           </div>
+          {loadingProdutos ? (
+            <div className="space-y-2 pt-1">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <div className="h-9 w-24 animate-pulse rounded bg-muted" />
+                  <div className="h-9 flex-1 animate-pulse rounded bg-muted" />
+                  <div className="h-9 w-10 animate-pulse rounded bg-muted" />
+                  <div className="h-9 w-20 animate-pulse rounded bg-muted" />
+                  <div className="h-9 w-32 animate-pulse rounded bg-muted" />
+                </div>
+              ))}
+            </div>
+          ) : (
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -115,6 +133,7 @@ function DashboardContent() {
               </TableBody>
             </Table>
           </div>
+          )}
       </div>
     </div>
   );
