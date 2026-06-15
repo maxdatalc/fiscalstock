@@ -142,7 +142,7 @@ SELECT
   COALESCE(c.cliNome, v.vedNomeDest) AS clienteNome,
   v.vedPlaca           AS placa,
   v.vedStatus          AS status,
-  CONVERT(VARCHAR(23), v.vedDataEmissao, 126) AS dataAbertura,
+  CONVERT(VARCHAR(23), v.vedAbertura, 126) AS dataAbertura,
   v.vedObs             AS obs,
   v.vedDefeitoRecl     AS defeito
 FROM venda v
@@ -153,7 +153,7 @@ WHERE v.empId   = @empId
   AND (@statusFilter = '' OR v.vedStatus = @statusFilter)
   AND (@clienteNome  = '' OR COALESCE(c.cliNome, v.vedNomeDest) LIKE @clienteNome)
   AND (@placa        = '' OR v.vedPlaca = @placa)
-ORDER BY v.vedDataEmissao DESC
+ORDER BY v.vedAbertura DESC
 `;
 
 // ---------------------------------------------------------------------------
@@ -167,7 +167,7 @@ SELECT
   COALESCE(c.cliNome, v.vedNomeDest) AS clienteNome,
   v.vedPlaca           AS placa,
   v.vedStatus          AS status,
-  CONVERT(VARCHAR(23), v.vedDataEmissao, 126) AS dataAbertura,
+  CONVERT(VARCHAR(23), v.vedAbertura, 126) AS dataAbertura,
   v.vedObs             AS obs,
   v.vedDefeitoRecl     AS defeito,
   v.vedLaudoTec        AS laudoTec
