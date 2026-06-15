@@ -18,6 +18,11 @@ export interface BridgeConfig {
   token: string;
 }
 
+/** Normalise bridge base URL: strip trailing slashes and accidental /query suffix. */
+function bridgeBase(url: string): string {
+  return url.replace(/\/+$/, "").replace(/\/query$/, "");
+}
+
 interface BridgeResponse<T> {
   rows: T[];
   error?: string;
@@ -38,7 +43,7 @@ export async function queryBridge<T = Record<string, unknown>>(
 
   let res: Response;
   try {
-    res = await fetch(`${config.url}/query`, {
+    res = await fetch(`${bridgeBase(config.url)}/query`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -84,7 +89,7 @@ export async function pingBridge(
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 8_000);
   try {
-    const res = await fetch(`${config.url}/query`, {
+    const res = await fetch(`${bridgeBase(config.url)}/query`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
