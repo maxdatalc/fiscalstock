@@ -5,12 +5,9 @@ import type { Database } from "@/integrations/supabase/types";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { calculateFiscalStock } from "@/lib/fiscal/calculate-fiscal-stock";
 import { statusToRiskLevel } from "@/lib/fiscal/stock-status";
-import {
-  searchProductsMaxApi,
-  getProductMaxApi,
-  buildMaxApiConfig,
-} from "@/lib/maxapi/maxapi-client";
+import { queryBridge } from "@/lib/bridge/bridge-client";
 import type { BridgeConfig } from "@/lib/bridge/bridge-client";
+import { resolveNamedQuery } from "@/lib/bridge/named-queries";
 
 const SearchInput = z.object({
   loja_id: z.string().uuid(),
@@ -50,6 +47,14 @@ export type ProductStockDetail = {
   alertas: { tipo: "warning" | "danger"; mensagem: string }[];
 };
 
+interface ProductRow {
+  proId: number;
+  proCodigo: string;
+  proDescricao: string;
+  proEstoqueAtual: number;
+  proUn: string;
+}
+
 // ---------------------------------------------------------------------------
 // Config helpers
 // ---------------------------------------------------------------------------
@@ -70,12 +75,12 @@ async function getLojaConfigs(supabaseAdmin: SupabaseClient<Database>, lojaId: s
   const [{ data: loja }, { data: cfg }] = await Promise.all([
     supabaseAdmin
       .from("lojas")
-      .select("emp_id_maxdata, terminal_maxdata")
+      .select("emp_id_maxdata")
       .eq("id", lojaId)
       .maybeSingle(),
     supabaseAdmin
       .from("integration_configs")
-      .select("bridge_url, bridge_token, maxapi_url")
+      .select("bridge_url, bridge_token")
       .eq("loja_id", lojaId)
       .maybeSingle(),
   ]);
@@ -88,15 +93,11 @@ async function getLojaConfigs(supabaseAdmin: SupabaseClient<Database>, lojaId: s
     throw new Error("Bridge SQL não configurada para esta loja");
   const bridge: BridgeConfig = { url: cfg.bridge_url, token: cfg.bridge_token };
 
-  const maxApi = cfg.maxapi_url ? buildMaxApiConfig(loja, cfg) : null;
-
-  return { empId, bridge, maxApi };
+  return { empId, bridge };
 }
 
 // ---------------------------------------------------------------------------
-// searchProducts
-// Uses MaxAPI /v2/product (returns estoque físico inline).
-// Falls back to Bridge SQL if MaxAPI is not configured.
+// searchProducts — Bridge SQL (returns proCodigo per loja)
 // ---------------------------------------------------------------------------
 
 export const searchProducts = createServerFn({ method: "POST" })
@@ -106,30 +107,31 @@ export const searchProducts = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     await assertLojaAccess(context.supabase, context.userId, data.loja_id);
-    const { maxApi } = await getLojaConfigs(supabaseAdmin, data.loja_id);
-
-    if (!maxApi) throw new Error("MaxAPI não configurada para esta loja");
 
     const termo = (data.termo ?? "").trim();
     if (!termo) return [];
 
-    const produtos = await searchProductsMaxApi(maxApi, supabaseAdmin, data.loja_id, termo);
+    const { empId, bridge } = await getLojaConfigs(supabaseAdmin, data.loja_id);
 
-    return produtos
-      .filter((p) => !p.desativado)
-      .map((p) => ({
-        id: String(p.id),
-        codigo: p.codigoFab ?? String(p.id),
-        codigoBarras: "",
-        nome: p.descricao ?? "",
-        unidade: p.un ?? "",
-        estoqueFisico: Number(p.estoque ?? 0),
-        estoqueFiscal: 0, // fiscal requer CTE por produto — calculado no detalhe
-      }));
+    const { sql, params } = resolveNamedQuery("SEARCH_PRODUCTS", {
+      empId,
+      termo: `%${termo}%`,
+    });
+    const rows = await queryBridge<ProductRow>(bridge, sql, params);
+
+    return rows.map((p) => ({
+      id: String(p.proId),
+      codigo: p.proCodigo ?? String(p.proId),
+      codigoBarras: "",
+      nome: p.proDescricao ?? "",
+      unidade: p.proUn ?? "",
+      estoqueFisico: Number(p.proEstoqueAtual ?? 0),
+      estoqueFiscal: 0,
+    }));
   });
 
 // ---------------------------------------------------------------------------
-// getProductStockDetail — physical (MaxAPI) + fiscal (Bridge CTE)
+// getProductStockDetail — physical (Bridge SQL) + fiscal (Bridge CTE)
 // ---------------------------------------------------------------------------
 
 export const getProductStockDetail = createServerFn({ method: "POST" })
@@ -139,19 +141,20 @@ export const getProductStockDetail = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     await assertLojaAccess(context.supabase, context.userId, data.loja_id);
-    const { empId, bridge, maxApi } = await getLojaConfigs(supabaseAdmin, data.loja_id);
+    const { empId, bridge } = await getLojaConfigs(supabaseAdmin, data.loja_id);
 
     const proId = parseInt(data.produto_id, 10);
     if (isNaN(proId)) throw new Error("produto_id inválido");
 
-    // Run physical (MaxAPI) and fiscal (Bridge CTE) concurrently
-    const [product, fiscalResult] = await Promise.all([
-      maxApi ? getProductMaxApi(maxApi, supabaseAdmin, data.loja_id, proId) : null,
+    const physQuery = resolveNamedQuery("GET_PRODUCT_PHYSICAL_STOCK", { empId, proId });
+
+    const [physRows, fiscalResult] = await Promise.all([
+      queryBridge<ProductRow>(bridge, physQuery.sql, physQuery.params),
       calculateFiscalStock(empId, proId, bridge),
     ]);
 
-    const estoqueFisico = product ? Number(product.estoque ?? 0) : fiscalResult.estoqueFisico;
-
+    const phys = physRows[0] ?? null;
+    const estoqueFisico = phys ? Number(phys.proEstoqueAtual ?? 0) : fiscalResult.estoqueFisico;
     const estoqueFiscal = fiscalResult.estoqueFiscal;
     const diferenca = estoqueFisico - estoqueFiscal;
     const status_risco = statusToRiskLevel(fiscalResult.statusCode);
@@ -172,10 +175,10 @@ export const getProductStockDetail = createServerFn({ method: "POST" })
     return {
       produto: {
         id: String(proId),
-        codigo: product?.codigoFab ?? fiscalResult.proCodigo,
+        codigo: phys?.proCodigo ?? fiscalResult.proCodigo,
         codigoBarras: "",
-        nome: product?.descricao ?? fiscalResult.proDescricao,
-        unidade: product?.un ?? fiscalResult.proUn,
+        nome: phys?.proDescricao ?? fiscalResult.proDescricao,
+        unidade: phys?.proUn ?? fiscalResult.proUn,
       },
       estoque_fisico: estoqueFisico,
       estoque_fiscal: estoqueFiscal,

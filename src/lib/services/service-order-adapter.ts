@@ -19,7 +19,7 @@ export interface IServiceOrderService {
 }
 
 function mapMaxApiStatus(s: string): OrdemServico["status"] {
-  if (s === "finalizada") return "faturada";
+  if (s === "finalizada" || s === "faturada") return "faturada";
   if (s === "cancelada") return "cancelada";
   return "aberta";
 }

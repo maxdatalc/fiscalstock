@@ -7,8 +7,6 @@ import type { BridgeConfig } from "@/lib/bridge/bridge-client";
 import { queryBridge } from "@/lib/bridge/bridge-client";
 import { resolveNamedQuery } from "@/lib/bridge/named-queries";
 import {
-  listServiceOrdersMaxApi,
-  getServiceOrderMaxApi,
   addItemToServiceOrderMaxApi,
   buildMaxApiConfig,
   type MaxApiConfig,
@@ -40,8 +38,24 @@ const AddItemInput = z.object({
 });
 
 // ---------------------------------------------------------------------------
-// Row shape for OS items (from Bridge SQL vendaItem)
+// Row shapes for Bridge SQL queries
 // ---------------------------------------------------------------------------
+
+interface OsListRow {
+  vedId: number;
+  vedNum: string | null;
+  clienteNome: string | null;
+  placa: string | null;
+  status: string;
+  dataAbertura: string | null;
+  obs: string | null;
+  defeito: string | null;
+}
+
+interface OsDetailRow extends OsListRow {
+  clienteId: number | null;
+  laudoTec: string | null;
+}
 
 interface OsItemRow {
   itemId: number;
@@ -112,7 +126,24 @@ async function logAuditoria(
 }
 
 // ---------------------------------------------------------------------------
-// listServiceOrders — MaxAPI GET /v2/serviceorder (response.docs)
+// Status mapping helpers (Bridge SQL vedStatus ↔ display strings)
+// ---------------------------------------------------------------------------
+
+function vedStatusToDisplay(s: string): string {
+  if (s === "F") return "faturada";
+  if (s === "C") return "cancelada";
+  return "aberta";
+}
+
+function displayToVedStatus(s: string): string {
+  if (s === "faturada" || s === "finalizada") return "F";
+  if (s === "cancelada") return "C";
+  if (s === "aberta" || s === "pendente") return "A";
+  return "";
+}
+
+// ---------------------------------------------------------------------------
+// listServiceOrders — Bridge SQL (returns all non-deleted OS without pagination)
 // ---------------------------------------------------------------------------
 
 export const listServiceOrders = createServerFn({ method: "POST" })
@@ -127,35 +158,37 @@ export const listServiceOrders = createServerFn({ method: "POST" })
     });
     if (!canAccess) throw new Error("Acesso negado a esta loja");
 
-    const { maxApi } = await getLojaConfig(supabaseAdmin, data.loja_id);
-    if (!maxApi) throw new Error("MaxAPI não configurada para esta loja");
+    const { bridge, empId } = await getLojaConfig(supabaseAdmin, data.loja_id);
 
-    const ordens = await listServiceOrdersMaxApi(maxApi, supabaseAdmin, data.loja_id, {
-      nomeCliente: data.cliente,
-      veiculoPlaca: data.placa,
-      status: data.status && data.status !== "todas" ? data.status : undefined,
+    const { sql, params } = resolveNamedQuery("LIST_SERVICE_ORDERS", {
+      empId,
+      statusFilter: data.status && data.status !== "todas" ? displayToVedStatus(data.status) : "",
+      clienteNome: data.cliente ? `%${data.cliente}%` : "",
+      placa: data.placa ?? "",
     });
 
-    return ordens.map((o) => ({
-      id: String(o.id),
-      numero: o.serie ?? String(o.id),
+    const rows = await queryBridge<OsListRow>(bridge, sql, params);
+
+    return rows.map((o) => ({
+      id: String(o.vedId),
+      numero: o.vedNum ?? String(o.vedId),
       cliente: o.clienteNome ?? "",
-      placa: o.placa ?? o.serie ?? "",
-      status: o.status,
-      statusOs: o.statusOs,
+      placa: o.placa ?? "",
+      status: vedStatusToDisplay(o.status),
+      statusOs: o.status,
       dataAbertura: o.dataAbertura,
-      totalNf: o.totalNf,
-      valorTotalProduto: o.valorTotalProduto,
-      valorTotalServico: o.valorTotalServico,
+      totalNf: 0,
+      valorTotalProduto: 0,
+      valorTotalServico: 0,
       obs: o.obs ?? "",
       defeito: o.defeito ?? "",
-      equipamento: o.equipamento ?? "",
-      marca: o.marca ?? "",
+      equipamento: "",
+      marca: "",
     }));
   });
 
 // ---------------------------------------------------------------------------
-// getServiceOrderDetail — MaxAPI GET /v2/serviceorder/{id}
+// getServiceOrderDetail — Bridge SQL
 // ---------------------------------------------------------------------------
 
 export const getServiceOrderDetail = createServerFn({ method: "POST" })
@@ -170,14 +203,30 @@ export const getServiceOrderDetail = createServerFn({ method: "POST" })
     });
     if (!canAccess) throw new Error("Acesso negado a esta loja");
 
-    const { maxApi } = await getLojaConfig(supabaseAdmin, data.loja_id);
-    if (!maxApi) throw new Error("MaxAPI não configurada para esta loja");
+    const { bridge, empId } = await getLojaConfig(supabaseAdmin, data.loja_id);
 
     const osId = parseInt(data.os_id, 10);
     if (isNaN(osId)) throw new Error("os_id inválido");
 
-    const os = await getServiceOrderMaxApi(maxApi, supabaseAdmin, data.loja_id, osId);
-    return os;
+    const { sql, params } = resolveNamedQuery("GET_SERVICE_ORDER_DETAIL", { empId, osId });
+    const rows = await queryBridge<OsDetailRow>(bridge, sql, params);
+
+    if (!rows[0]) throw new Error("Ordem de serviço não encontrada");
+
+    const o = rows[0];
+    return {
+      id: String(o.vedId),
+      numero: o.vedNum ?? String(o.vedId),
+      clienteId: o.clienteId ? String(o.clienteId) : null,
+      cliente: o.clienteNome ?? "",
+      placa: o.placa ?? "",
+      status: vedStatusToDisplay(o.status),
+      statusOs: o.status,
+      dataAbertura: o.dataAbertura,
+      obs: o.obs ?? "",
+      defeito: o.defeito ?? "",
+      laudoTec: o.laudoTec ?? "",
+    };
   });
 
 // ---------------------------------------------------------------------------

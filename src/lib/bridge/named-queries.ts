@@ -12,14 +12,15 @@
 
 // ---------------------------------------------------------------------------
 // Query 1 — SEARCH_PRODUCTS
+// proEstoqueAtual comes from produto_empresa (per-loja stock, not global total)
 // ---------------------------------------------------------------------------
 const SEARCH_PRODUCTS = `
 SELECT TOP 30
-  p.proId         AS proId,
-  p.proCodigo     AS proCodigo,
-  p.proDescricao  AS proDescricao,
-  p.proEstoqueAtual AS proEstoqueAtual,
-  p.proUn         AS proUn
+  p.proId          AS proId,
+  p.proCodigo      AS proCodigo,
+  p.proDescricao   AS proDescricao,
+  pe.proEstoqueAtual AS proEstoqueAtual,
+  p.proUn          AS proUn
 FROM produto p
 INNER JOIN produto_empresa pe ON pe.proId = p.proId AND pe.empId = @empId
 WHERE
@@ -33,14 +34,15 @@ ORDER BY p.proDescricao
 
 // ---------------------------------------------------------------------------
 // Query 2 — GET_PRODUCT_PHYSICAL_STOCK
+// proEstoqueAtual comes from produto_empresa (per-loja stock, not global total)
 // ---------------------------------------------------------------------------
 const GET_PRODUCT_PHYSICAL_STOCK = `
 SELECT
-  p.proId         AS proId,
-  p.proCodigo     AS proCodigo,
-  p.proDescricao  AS proDescricao,
-  p.proEstoqueAtual AS proEstoqueAtual,
-  p.proUn         AS proUn
+  p.proId          AS proId,
+  p.proCodigo      AS proCodigo,
+  p.proDescricao   AS proDescricao,
+  pe.proEstoqueAtual AS proEstoqueAtual,
+  p.proUn          AS proUn
 FROM produto p
 INNER JOIN produto_empresa pe ON pe.proId = p.proId AND pe.empId = @empId
 WHERE p.proId = @proId
@@ -129,11 +131,12 @@ CROSS JOIN Ajustes aj
 `;
 
 // ---------------------------------------------------------------------------
-// Query 4 — LIST_OPEN_SERVICE_ORDERS
-// Reads from venda (OS type, open status) with client name.
+// Query 4 — LIST_SERVICE_ORDERS
+// All OS for loja (excludes only deleted 'Z'); optional filters via empty-string
+// guards so all params are always passed (SQL Server requires declared params).
 // ---------------------------------------------------------------------------
-const LIST_OPEN_SERVICE_ORDERS = `
-SELECT TOP 50
+const LIST_SERVICE_ORDERS = `
+SELECT
   v.vedId              AS vedId,
   v.vedNum             AS vedNum,
   COALESCE(c.cliNome, v.vedNomeDest) AS clienteNome,
@@ -144,9 +147,12 @@ SELECT TOP 50
   v.vedDefeitoRecl     AS defeito
 FROM venda v
 LEFT JOIN cliente c ON c.cliId = v.vedCliId
-WHERE v.empId    = @empId
-  AND v.vedTipo  = 'OS'
-  AND v.vedStatus = 'A'
+WHERE v.empId   = @empId
+  AND v.vedTipo = 'OS'
+  AND v.vedStatus NOT IN ('Z')
+  AND (@statusFilter = '' OR v.vedStatus = @statusFilter)
+  AND (@clienteNome  = '' OR COALESCE(c.cliNome, v.vedNomeDest) LIKE @clienteNome)
+  AND (@placa        = '' OR v.vedPlaca = @placa)
 ORDER BY v.vedDataEmissao DESC
 `;
 
@@ -216,9 +222,9 @@ const REGISTRY: Record<string, QueryDef> = {
     sql: GET_FISCAL_STOCK_COMPOSITION,
     allowedParams: ["empId", "proId"],
   },
-  LIST_OPEN_SERVICE_ORDERS: {
-    sql: LIST_OPEN_SERVICE_ORDERS,
-    allowedParams: ["empId"],
+  LIST_SERVICE_ORDERS: {
+    sql: LIST_SERVICE_ORDERS,
+    allowedParams: ["empId", "statusFilter", "clienteNome", "placa"],
   },
   GET_SERVICE_ORDER_DETAIL: {
     sql: GET_SERVICE_ORDER_DETAIL,
