@@ -1,4 +1,4 @@
-import { createServerFn } from "@tanstack/react-start";
+﻿import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
@@ -84,29 +84,34 @@ interface OsItemRow {
 // ---------------------------------------------------------------------------
 
 async function getLojaConfig(supabaseAdmin: SupabaseClient<Database>, lojaId: string) {
+  // Bridge config: lojas.sql_bridge_url / sql_bridge_token (schema do dashboard)
+  // MaxAPI config: integration_configs (criada pelo FiscalStock)
   const [{ data: loja }, { data: cfg }] = await Promise.all([
     supabaseAdmin
       .from("lojas")
-      .select("emp_id_maxdata, terminal_maxdata, empresa_id")
+      .select("emp_id, terminal_maxdata, tenant_id, name, is_active, sql_bridge_url, sql_bridge_token")
       .eq("id", lojaId)
       .maybeSingle(),
     supabaseAdmin
       .from("integration_configs")
-      .select("bridge_url, bridge_token, maxapi_url")
+      .select("maxapi_url")
       .eq("loja_id", lojaId)
       .maybeSingle(),
   ]);
 
   if (!loja) throw new Error("Loja não encontrada");
-  if (!cfg?.bridge_url || !cfg?.bridge_token)
+  if (!loja.sql_bridge_url || !loja.sql_bridge_token)
     throw new Error("Bridge SQL não configurada para esta loja");
 
-  const bridge: BridgeConfig = { url: cfg.bridge_url, token: cfg.bridge_token };
-  const empId = parseInt(loja.emp_id_maxdata, 10);
+  const bridge: BridgeConfig = { url: loja.sql_bridge_url, token: loja.sql_bridge_token };
+  const empId = loja.emp_id; // já integer no schema do dashboard
 
   let maxApi: MaxApiConfig | null = null;
-  if (cfg.maxapi_url) {
-    maxApi = buildMaxApiConfig(loja, cfg);
+  if (cfg?.maxapi_url) {
+    maxApi = buildMaxApiConfig(
+      { emp_id_maxdata: String(loja.emp_id), terminal_maxdata: loja.terminal_maxdata ?? "1" },
+      { maxapi_url: cfg.maxapi_url },
+    );
   }
 
   return { loja, bridge, empId, maxApi };
@@ -116,7 +121,7 @@ async function logAuditoria(
   supabaseAdmin: SupabaseClient<Database>,
   opts: {
     userId: string;
-    empresa_id?: string | null;
+    tenant_id?: string | null;
     loja_id?: string | null;
     acao: string;
     entidade?: string;
@@ -124,9 +129,9 @@ async function logAuditoria(
     detalhes?: unknown;
   },
 ) {
-  await supabaseAdmin.from("audit_logs").insert({
+  await supabaseAdmin.from("fs_audit_logs").insert({
     user_id: opts.userId,
-    empresa_id: opts.empresa_id ?? null,
+    tenant_id: opts.tenant_id ?? null,
     loja_id: opts.loja_id ?? null,
     acao: opts.acao,
     entidade: opts.entidade ?? null,
@@ -162,7 +167,7 @@ export const listServiceOrders = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const { data: canAccess } = await context.supabase.rpc("user_can_access_loja", {
+    const { data: canAccess } = await context.supabase.rpc("fs_user_can_access_loja", {
       _user_id: context.userId,
       _loja_id: data.loja_id,
     });
@@ -206,7 +211,7 @@ export const getServiceOrderDetail = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const { data: canAccess } = await context.supabase.rpc("user_can_access_loja", {
+    const { data: canAccess } = await context.supabase.rpc("fs_user_can_access_loja", {
       _user_id: context.userId,
       _loja_id: data.loja_id,
     });
@@ -248,7 +253,7 @@ export const getServiceOrderItems = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const { data: canAccess } = await context.supabase.rpc("user_can_access_loja", {
+    const { data: canAccess } = await context.supabase.rpc("fs_user_can_access_loja", {
       _user_id: context.userId,
       _loja_id: data.loja_id,
     });
@@ -295,7 +300,7 @@ export const addItemToServiceOrder = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     // Step 1 — auth
-    const { data: canAccess } = await context.supabase.rpc("user_can_access_loja", {
+    const { data: canAccess } = await context.supabase.rpc("fs_user_can_access_loja", {
       _user_id: context.userId,
       _loja_id: data.loja_id,
     });
@@ -320,7 +325,7 @@ export const addItemToServiceOrder = createServerFn({ method: "POST" })
 
     const auditBase = {
       userId: context.userId,
-      empresa_id: loja.empresa_id,
+      tenant_id: loja.tenant_id,
       loja_id: data.loja_id,
       entidade: "ordem_servico",
       entidade_id: data.os_id,

@@ -6,7 +6,6 @@ import { pingBridge } from "@/lib/bridge/bridge-client";
 import { getOrRefreshToken, buildMaxApiConfig } from "@/lib/maxapi/maxapi-client";
 
 type IntegrationConfigInsert = Database["public"]["Tables"]["integration_configs"]["Insert"];
-type LojaUpdate = Database["public"]["Tables"]["lojas"]["Update"];
 
 const LojaInput = z.object({ loja_id: z.string().uuid() });
 
@@ -27,46 +26,43 @@ export const getIntegrationStatus = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<IntegrationStatusInfo | null> => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const { data: can } = await context.supabase.rpc("user_can_access_loja", {
+    const { data: can } = await context.supabase.rpc("fs_user_can_access_loja", {
       _user_id: context.userId,
       _loja_id: data.loja_id,
     });
     if (!can) throw new Error("Acesso negado a esta loja");
 
-    const [{ data: cfg }, { data: loja }] = await Promise.all([
-      supabaseAdmin
-        .from("integration_configs")
-        .select(
-          "loja_id,status_bridge,status_maxapi,ultimo_teste_bridge,ultimo_teste_maxapi,bridge_url,bridge_token,maxapi_url",
-        )
-        .eq("loja_id", data.loja_id)
-        .maybeSingle(),
+    const [{ data: loja }, { data: cfg }] = await Promise.all([
       supabaseAdmin
         .from("lojas")
-        .select("emp_id_maxdata, terminal_maxdata")
+        .select("emp_id, terminal_maxdata, sql_bridge_url, sql_bridge_token")
         .eq("id", data.loja_id)
+        .maybeSingle(),
+      supabaseAdmin
+        .from("integration_configs")
+        .select("loja_id, status_bridge, status_maxapi, ultimo_teste_bridge, ultimo_teste_maxapi, maxapi_url")
+        .eq("loja_id", data.loja_id)
         .maybeSingle(),
     ]);
 
-    if (!cfg) return null;
+    if (!loja) return null;
 
-    // MaxAPI is configured when URL + loja empId + terminal are all present
-    const maxapiConfigurada = !!(cfg.maxapi_url && loja?.emp_id_maxdata && loja?.terminal_maxdata);
+    const maxapiConfigurada = !!(cfg?.maxapi_url && loja.emp_id && loja.terminal_maxdata);
 
     return {
-      loja_id: cfg.loja_id,
-      status_bridge: cfg.status_bridge,
-      status_maxapi: cfg.status_maxapi,
-      ultimo_teste_bridge: cfg.ultimo_teste_bridge,
-      ultimo_teste_maxapi: cfg.ultimo_teste_maxapi,
-      bridge_configurada: !!(cfg.bridge_url && cfg.bridge_token),
+      loja_id: data.loja_id,
+      status_bridge: cfg?.status_bridge ?? "nao_configurado",
+      status_maxapi: cfg?.status_maxapi ?? "nao_configurado",
+      ultimo_teste_bridge: cfg?.ultimo_teste_bridge ?? null,
+      ultimo_teste_maxapi: cfg?.ultimo_teste_maxapi ?? null,
+      bridge_configurada: !!(loja.sql_bridge_url && loja.sql_bridge_token),
       maxapi_configurada: maxapiConfigurada,
     };
   });
 
 async function logAuditoria(opts: {
   userId: string;
-  empresa_id?: string | null;
+  tenant_id?: string | null;
   loja_id?: string | null;
   acao: string;
   entidade?: string;
@@ -74,9 +70,9 @@ async function logAuditoria(opts: {
   detalhes?: unknown;
 }) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  await supabaseAdmin.from("audit_logs").insert({
+  await supabaseAdmin.from("fs_audit_logs").insert({
     user_id: opts.userId,
-    empresa_id: opts.empresa_id ?? null,
+    tenant_id: opts.tenant_id ?? null,
     loja_id: opts.loja_id ?? null,
     acao: opts.acao,
     entidade: opts.entidade ?? null,
@@ -91,27 +87,24 @@ export const testBridgeConnection = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const { data: canManage } = await context.supabase.rpc("user_can_manage_loja", {
+    const { data: canManage } = await context.supabase.rpc("fs_user_can_manage_loja", {
       _user_id: context.userId,
       _loja_id: data.loja_id,
     });
     if (!canManage) throw new Error("Apenas owner/admin pode testar integrações.");
 
-    const [{ data: cfg }, { data: loja }] = await Promise.all([
-      supabaseAdmin
-        .from("integration_configs")
-        .select("bridge_url, bridge_token, loja_id")
-        .eq("loja_id", data.loja_id)
-        .maybeSingle(),
-      supabaseAdmin.from("lojas").select("empresa_id").eq("id", data.loja_id).maybeSingle(),
-    ]);
+    const { data: loja } = await supabaseAdmin
+      .from("lojas")
+      .select("tenant_id, sql_bridge_url, sql_bridge_token")
+      .eq("id", data.loja_id)
+      .maybeSingle();
 
     let status: "online" | "offline" | "erro" | "nao_configurado" = "nao_configurado";
     let mensagem = "Bridge SQL ainda não configurada para esta loja.";
     let latencia_ms: number | null = null;
 
-    if (cfg?.bridge_url && cfg?.bridge_token) {
-      const result = await pingBridge({ url: cfg.bridge_url, token: cfg.bridge_token });
+    if (loja?.sql_bridge_url && loja?.sql_bridge_token) {
+      const result = await pingBridge({ url: loja.sql_bridge_url, token: loja.sql_bridge_token });
       if (result.ok) {
         status = "online";
         mensagem = `Bridge respondeu em ${result.ms}ms — banco: ${result.db || "BATAUTO"}`;
@@ -120,7 +113,7 @@ export const testBridgeConnection = createServerFn({ method: "POST" })
         status = "erro";
         mensagem = `Bridge SQL erro: ${result.error ?? "sem resposta"}`;
       }
-    } else if (cfg?.bridge_url && !cfg?.bridge_token) {
+    } else if (loja?.sql_bridge_url && !loja?.sql_bridge_token) {
       status = "nao_configurado";
       mensagem = "Bridge URL configurada mas token ausente.";
     }
@@ -136,7 +129,7 @@ export const testBridgeConnection = createServerFn({ method: "POST" })
 
     await logAuditoria({
       userId: context.userId,
-      empresa_id: loja?.empresa_id,
+      tenant_id: loja?.tenant_id,
       loja_id: data.loja_id,
       acao: "TESTOU_INTEGRACAO_BRIDGE",
       entidade: "integration_configs",
@@ -153,7 +146,7 @@ export const testMaxApiConnection = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const { data: canManage } = await context.supabase.rpc("user_can_manage_loja", {
+    const { data: canManage } = await context.supabase.rpc("fs_user_can_manage_loja", {
       _user_id: context.userId,
       _loja_id: data.loja_id,
     });
@@ -162,7 +155,7 @@ export const testMaxApiConnection = createServerFn({ method: "POST" })
     const [{ data: loja }, { data: cfg }] = await Promise.all([
       supabaseAdmin
         .from("lojas")
-        .select("id, empresa_id, emp_id_maxdata, terminal_maxdata")
+        .select("id, tenant_id, emp_id, terminal_maxdata")
         .eq("id", data.loja_id)
         .maybeSingle(),
       supabaseAdmin
@@ -176,11 +169,14 @@ export const testMaxApiConnection = createServerFn({ method: "POST" })
     let mensagem = "MaxAPI ainda não configurada para esta loja.";
     let token_cached_until: string | null = null;
 
-    const isConfigured = !!(cfg?.maxapi_url && loja?.emp_id_maxdata && loja?.terminal_maxdata);
+    const isConfigured = !!(cfg?.maxapi_url && loja?.emp_id && loja?.terminal_maxdata);
 
     if (isConfigured) {
       try {
-        const maxApiConfig = buildMaxApiConfig(loja!, cfg!);
+        const maxApiConfig = buildMaxApiConfig(
+          { emp_id_maxdata: String(loja!.emp_id), terminal_maxdata: loja!.terminal_maxdata ?? "1" },
+          { maxapi_url: cfg!.maxapi_url },
+        );
         const token = await getOrRefreshToken(maxApiConfig, supabaseAdmin, data.loja_id);
 
         const { data: refreshed } = await supabaseAdmin
@@ -200,7 +196,7 @@ export const testMaxApiConnection = createServerFn({ method: "POST" })
       }
     } else if (cfg?.maxapi_url) {
       status = "nao_configurado";
-      mensagem = "MaxAPI URL configurada mas emp_id_maxdata ou terminal_maxdata ausentes na loja.";
+      mensagem = "MaxAPI URL configurada mas emp_id ou terminal_maxdata ausentes na loja.";
     }
 
     await supabaseAdmin.from("integration_configs").upsert(
@@ -214,7 +210,7 @@ export const testMaxApiConnection = createServerFn({ method: "POST" })
 
     await logAuditoria({
       userId: context.userId,
-      empresa_id: loja?.empresa_id,
+      tenant_id: loja?.tenant_id,
       loja_id: data.loja_id,
       acao: "TESTOU_INTEGRACAO_MAXAPI",
       entidade: "integration_configs",
@@ -227,7 +223,7 @@ export const testMaxApiConnection = createServerFn({ method: "POST" })
 
 // ---------------------------------------------------------------------------
 // getIntegrationConfig — lê config atual para pré-popular formulário
-// Não expõe bridge_token (retorna apenas se está preenchido)
+// bridge_token não é exposto (apenas indica se está preenchido)
 // ---------------------------------------------------------------------------
 
 export type IntegrationConfig = {
@@ -244,38 +240,41 @@ export const getIntegrationConfig = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<IntegrationConfig | null> => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const { data: canManage } = await context.supabase.rpc("user_can_manage_loja", {
+    const { data: canManage } = await context.supabase.rpc("fs_user_can_manage_loja", {
       _user_id: context.userId,
       _loja_id: data.loja_id,
     });
     if (!canManage) throw new Error("Apenas owner/admin pode ver configurações de integração.");
 
-    const [{ data: cfg }, { data: loja }] = await Promise.all([
-      supabaseAdmin
-        .from("integration_configs")
-        .select("bridge_url, bridge_token, maxapi_url")
-        .eq("loja_id", data.loja_id)
-        .maybeSingle(),
+    const [{ data: loja }, { data: cfg }] = await Promise.all([
       supabaseAdmin
         .from("lojas")
-        .select("emp_id_maxdata, terminal_maxdata")
+        .select("emp_id, terminal_maxdata, sql_bridge_url, sql_bridge_token")
         .eq("id", data.loja_id)
+        .maybeSingle(),
+      supabaseAdmin
+        .from("integration_configs")
+        .select("maxapi_url")
+        .eq("loja_id", data.loja_id)
         .maybeSingle(),
     ]);
 
-    if (!cfg && !loja) return null;
+    if (!loja) return null;
 
     return {
-      bridge_url: cfg?.bridge_url ?? null,
-      bridge_token_configurado: !!cfg?.bridge_token,
+      bridge_url: loja.sql_bridge_url ?? null,
+      bridge_token_configurado: !!loja.sql_bridge_token,
       maxapi_url: cfg?.maxapi_url ?? null,
-      emp_id_maxdata: loja?.emp_id_maxdata ?? null,
-      terminal_maxdata: loja?.terminal_maxdata ?? null,
+      emp_id_maxdata: loja.emp_id ? String(loja.emp_id) : null,
+      terminal_maxdata: loja.terminal_maxdata ?? null,
     };
   });
 
 // ---------------------------------------------------------------------------
-// saveIntegrationConfig — salva todas as credenciais MaxData de uma loja
+// saveIntegrationConfig — salva credenciais MaxData de uma loja
+// Bridge URL/token → lojas.sql_bridge_url/token
+// MaxAPI URL → integration_configs.maxapi_url
+// terminal_maxdata → lojas.terminal_maxdata
 // Requer role owner/admin. Invalida cache do token MaxAPI ao salvar.
 // ---------------------------------------------------------------------------
 
@@ -284,7 +283,6 @@ const SaveConfigInput = z.object({
   bridge_url: z.string().url("URL da Bridge inválida").optional().or(z.literal("")),
   bridge_token: z.string().optional(),
   maxapi_url: z.string().url("URL da MaxAPI inválida").optional().or(z.literal("")),
-  emp_id_maxdata: z.string().optional(),
   terminal_maxdata: z.string().optional(),
 });
 
@@ -294,7 +292,7 @@ export const saveIntegrationConfig = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const { data: canManage } = await context.supabase.rpc("user_can_manage_loja", {
+    const { data: canManage } = await context.supabase.rpc("fs_user_can_manage_loja", {
       _user_id: context.userId,
       _loja_id: data.loja_id,
     });
@@ -302,45 +300,43 @@ export const saveIntegrationConfig = createServerFn({ method: "POST" })
 
     const { data: loja } = await supabaseAdmin
       .from("lojas")
-      .select("empresa_id")
+      .select("tenant_id")
       .eq("id", data.loja_id)
       .maybeSingle();
 
-    const invalidaTokenMaxApi =
-      data.maxapi_url !== undefined ||
-      data.emp_id_maxdata !== undefined ||
-      data.terminal_maxdata !== undefined;
+    const invalidaTokenMaxApi = data.maxapi_url !== undefined || data.terminal_maxdata !== undefined;
 
-    const cfgUpsert: IntegrationConfigInsert = { loja_id: data.loja_id };
-    if (data.bridge_url !== undefined) cfgUpsert.bridge_url = data.bridge_url || null;
+    // Bridge e terminal vão para lojas
+    const lojaUpdate: Record<string, string | null> = {};
+    if (data.bridge_url !== undefined) lojaUpdate.sql_bridge_url = data.bridge_url || null;
     if (data.bridge_token !== undefined && data.bridge_token !== "")
-      cfgUpsert.bridge_token = data.bridge_token;
+      lojaUpdate.sql_bridge_token = data.bridge_token;
+    if (data.terminal_maxdata !== undefined)
+      lojaUpdate.terminal_maxdata = data.terminal_maxdata || null;
+
+    if (Object.keys(lojaUpdate).length > 0) {
+      await supabaseAdmin.from("lojas").update(lojaUpdate).eq("id", data.loja_id);
+    }
+
+    // MaxAPI vai para integration_configs
+    const cfgUpsert: IntegrationConfigInsert = { loja_id: data.loja_id };
     if (data.maxapi_url !== undefined) cfgUpsert.maxapi_url = data.maxapi_url || null;
     if (invalidaTokenMaxApi) {
       cfgUpsert.maxapi_token_cache = null;
       cfgUpsert.maxapi_token_expires_at = null;
     }
-
     await supabaseAdmin.from("integration_configs").upsert(cfgUpsert, { onConflict: "loja_id" });
-
-    if (data.emp_id_maxdata !== undefined || data.terminal_maxdata !== undefined) {
-      const lojaUpdate: LojaUpdate = {};
-      if (data.emp_id_maxdata !== undefined) lojaUpdate.emp_id_maxdata = data.emp_id_maxdata;
-      if (data.terminal_maxdata !== undefined) lojaUpdate.terminal_maxdata = data.terminal_maxdata;
-      await supabaseAdmin.from("lojas").update(lojaUpdate).eq("id", data.loja_id);
-    }
 
     const camposAlterados = [
       data.bridge_url !== undefined && "bridge_url",
       data.bridge_token !== undefined && data.bridge_token !== "" && "bridge_token",
       data.maxapi_url !== undefined && "maxapi_url",
-      data.emp_id_maxdata !== undefined && "emp_id_maxdata",
       data.terminal_maxdata !== undefined && "terminal_maxdata",
     ].filter(Boolean);
 
     await logAuditoria({
       userId: context.userId,
-      empresa_id: loja?.empresa_id,
+      tenant_id: loja?.tenant_id,
       loja_id: data.loja_id,
       acao: "SALVOU_CONFIG_INTEGRACAO",
       entidade: "integration_configs",

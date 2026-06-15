@@ -7,147 +7,206 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
-      audit_logs: {
+      // ------------------------------------------------------------------
+      // lojas — tabela existente do dashboard, usada por FiscalStock
+      // Bridge config: sql_bridge_url + sql_bridge_token (já existem)
+      // terminal_maxdata adicionado via migração (ADD COLUMN)
+      // ------------------------------------------------------------------
+      lojas: {
         Row: {
-          acao: string
-          created_at: string
-          detalhes_json: Json | null
-          empresa_id: string | null
-          entidade: string | null
-          entidade_id: string | null
           id: string
-          ip_origem: string | null
-          loja_id: string | null
-          user_id: string | null
-        }
-        Insert: {
-          acao: string
-          created_at?: string
-          detalhes_json?: Json | null
-          empresa_id?: string | null
-          entidade?: string | null
-          entidade_id?: string | null
-          id?: string
-          ip_origem?: string | null
-          loja_id?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          acao?: string
-          created_at?: string
-          detalhes_json?: Json | null
-          empresa_id?: string | null
-          entidade?: string | null
-          entidade_id?: string | null
-          id?: string
-          ip_origem?: string | null
-          loja_id?: string | null
-          user_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "audit_logs_empresa_id_fkey"
-            columns: ["empresa_id"]
-            isOneToOne: false
-            referencedRelation: "empresas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "audit_logs_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "lojas"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      empresas: {
-        Row: {
-          ativo: boolean
-          cnpj: string | null
+          tenant_id: string
+          name: string
+          emp_id: number
+          erp_base_url: string | null
+          terminal_encrypted: string | null
+          terminal_maxdata: string | null
+          is_active: boolean
+          sql_bridge_url: string | null
+          sql_bridge_token: string | null
+          sql_enabled: boolean | null
+          sync_services_enabled: boolean | null
+          sync_paused: boolean | null
+          sync_paused_at: string | null
+          sync_paused_by: string | null
+          sync_pause_reason: string | null
           created_at: string
-          id: string
-          nome_fantasia: string
-          razao_social: string | null
           updated_at: string
         }
         Insert: {
-          ativo?: boolean
-          cnpj?: string | null
-          created_at?: string
           id?: string
-          nome_fantasia: string
-          razao_social?: string | null
+          tenant_id: string
+          name: string
+          emp_id: number
+          erp_base_url?: string | null
+          terminal_encrypted?: string | null
+          terminal_maxdata?: string | null
+          is_active?: boolean
+          sql_bridge_url?: string | null
+          sql_bridge_token?: string | null
+          sql_enabled?: boolean | null
+          sync_services_enabled?: boolean | null
+          sync_paused?: boolean | null
+          sync_paused_at?: string | null
+          sync_paused_by?: string | null
+          sync_pause_reason?: string | null
+          created_at?: string
           updated_at?: string
         }
         Update: {
-          ativo?: boolean
-          cnpj?: string | null
-          created_at?: string
           id?: string
-          nome_fantasia?: string
-          razao_social?: string | null
+          tenant_id?: string
+          name?: string
+          emp_id?: number
+          erp_base_url?: string | null
+          terminal_encrypted?: string | null
+          terminal_maxdata?: string | null
+          is_active?: boolean
+          sql_bridge_url?: string | null
+          sql_bridge_token?: string | null
+          sql_enabled?: boolean | null
+          sync_services_enabled?: boolean | null
+          sync_paused?: boolean | null
+          sync_paused_at?: string | null
+          sync_paused_by?: string | null
+          sync_pause_reason?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lojas_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      // ------------------------------------------------------------------
+      // tenants — usado como "empresas" no FiscalStock
+      // ------------------------------------------------------------------
+      tenants: {
+        Row: {
+          id: string
+          name: string
+          slug: string | null
+          plan: string | null
+          is_active: boolean
+          dominio_customizado: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          slug?: string | null
+          plan?: string | null
+          is_active?: boolean
+          dominio_customizado?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          slug?: string | null
+          plan?: string | null
+          is_active?: boolean
+          dominio_customizado?: string | null
+          created_at?: string
           updated_at?: string
         }
         Relationships: []
       }
+      // ------------------------------------------------------------------
+      // tenant_users — usado como "user_empresas" no FiscalStock
+      // ------------------------------------------------------------------
+      tenant_users: {
+        Row: {
+          id: string
+          tenant_id: string
+          user_id: string
+          role: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          user_id: string
+          role?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          user_id?: string
+          role?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_users_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      // ------------------------------------------------------------------
+      // integration_configs — MaxAPI config + token cache (criada por FiscalStock)
+      // NÃO contém bridge_url/token (esses ficam em lojas.sql_bridge_*)
+      // ------------------------------------------------------------------
       integration_configs: {
         Row: {
-          bridge_token: string | null
-          bridge_url: string | null
-          created_at: string
           id: string
           loja_id: string
+          maxapi_url: string | null
           maxapi_client_id: string | null
           maxapi_secret_key: string | null
           maxapi_token_cache: string | null
           maxapi_token_expires_at: string | null
-          maxapi_url: string | null
-          status_bridge: Database["public"]["Enums"]["integration_status"]
-          status_maxapi: Database["public"]["Enums"]["integration_status"]
+          status_maxapi: string
+          status_bridge: string
           ultimo_teste_bridge: string | null
           ultimo_teste_maxapi: string | null
+          created_at: string
           updated_at: string
         }
         Insert: {
-          bridge_token?: string | null
-          bridge_url?: string | null
-          created_at?: string
           id?: string
           loja_id: string
+          maxapi_url?: string | null
           maxapi_client_id?: string | null
           maxapi_secret_key?: string | null
           maxapi_token_cache?: string | null
           maxapi_token_expires_at?: string | null
-          maxapi_url?: string | null
-          status_bridge?: Database["public"]["Enums"]["integration_status"]
-          status_maxapi?: Database["public"]["Enums"]["integration_status"]
+          status_maxapi?: string
+          status_bridge?: string
           ultimo_teste_bridge?: string | null
           ultimo_teste_maxapi?: string | null
+          created_at?: string
           updated_at?: string
         }
         Update: {
-          bridge_token?: string | null
-          bridge_url?: string | null
-          created_at?: string
           id?: string
           loja_id?: string
+          maxapi_url?: string | null
           maxapi_client_id?: string | null
           maxapi_secret_key?: string | null
           maxapi_token_cache?: string | null
           maxapi_token_expires_at?: string | null
-          maxapi_url?: string | null
-          status_bridge?: Database["public"]["Enums"]["integration_status"]
-          status_maxapi?: Database["public"]["Enums"]["integration_status"]
+          status_maxapi?: string
+          status_bridge?: string
           ultimo_teste_bridge?: string | null
           ultimo_teste_maxapi?: string | null
+          created_at?: string
           updated_at?: string
         }
         Relationships: [
@@ -157,113 +216,100 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "lojas"
             referencedColumns: ["id"]
-          },
+          }
         ]
       }
-      lojas: {
+      // ------------------------------------------------------------------
+      // fs_profiles — perfis FiscalStock (criada por FiscalStock)
+      // ------------------------------------------------------------------
+      fs_profiles: {
         Row: {
+          id: string
+          user_id: string
+          email: string
+          nome: string
+          role: string
           ativo: boolean
           created_at: string
-          emp_id_maxdata: string
-          empresa_id: string
-          id: string
-          nome: string
-          terminal_maxdata: string
           updated_at: string
         }
         Insert: {
-          ativo?: boolean
-          created_at?: string
-          emp_id_maxdata: string
-          empresa_id: string
           id?: string
-          nome: string
-          terminal_maxdata: string
-          updated_at?: string
-        }
-        Update: {
-          ativo?: boolean
-          created_at?: string
-          emp_id_maxdata?: string
-          empresa_id?: string
-          id?: string
-          nome?: string
-          terminal_maxdata?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "lojas_empresa_id_fkey"
-            columns: ["empresa_id"]
-            isOneToOne: false
-            referencedRelation: "empresas"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      profiles: {
-        Row: {
-          ativo: boolean
-          created_at: string
-          email: string
-          id: string
-          nome: string
-          role: Database["public"]["Enums"]["app_role"]
-          updated_at: string
           user_id: string
-        }
-        Insert: {
-          ativo?: boolean
-          created_at?: string
-          email: string
-          id?: string
-          nome?: string
-          role?: Database["public"]["Enums"]["app_role"]
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          ativo?: boolean
-          created_at?: string
           email?: string
-          id?: string
           nome?: string
-          role?: Database["public"]["Enums"]["app_role"]
+          role?: string
+          ativo?: boolean
+          created_at?: string
           updated_at?: string
+        }
+        Update: {
+          id?: string
           user_id?: string
+          email?: string
+          nome?: string
+          role?: string
+          ativo?: boolean
+          created_at?: string
+          updated_at?: string
         }
         Relationships: []
       }
-      user_empresas: {
+      // ------------------------------------------------------------------
+      // fs_audit_logs — auditoria FiscalStock (criada por FiscalStock)
+      // ------------------------------------------------------------------
+      fs_audit_logs: {
         Row: {
-          created_at: string
-          empresa_id: string
           id: string
-          role_na_empresa: Database["public"]["Enums"]["app_role"]
-          user_id: string
+          user_id: string | null
+          tenant_id: string | null
+          loja_id: string | null
+          acao: string
+          entidade: string | null
+          entidade_id: string | null
+          detalhes_json: Json | null
+          ip_origem: string | null
+          created_at: string
         }
         Insert: {
-          created_at?: string
-          empresa_id: string
           id?: string
-          role_na_empresa?: Database["public"]["Enums"]["app_role"]
-          user_id: string
+          user_id?: string | null
+          tenant_id?: string | null
+          loja_id?: string | null
+          acao: string
+          entidade?: string | null
+          entidade_id?: string | null
+          detalhes_json?: Json | null
+          ip_origem?: string | null
+          created_at?: string
         }
         Update: {
-          created_at?: string
-          empresa_id?: string
           id?: string
-          role_na_empresa?: Database["public"]["Enums"]["app_role"]
-          user_id?: string
+          user_id?: string | null
+          tenant_id?: string | null
+          loja_id?: string | null
+          acao?: string
+          entidade?: string | null
+          entidade_id?: string | null
+          detalhes_json?: Json | null
+          ip_origem?: string | null
+          created_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "user_empresas_empresa_id_fkey"
-            columns: ["empresa_id"]
+            foreignKeyName: "fs_audit_logs_tenant_id_fkey"
+            columns: ["tenant_id"]
             isOneToOne: false
-            referencedRelation: "empresas"
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "fs_audit_logs_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "lojas"
+            referencedColumns: ["id"]
+          }
         ]
       }
     }
@@ -271,31 +317,21 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      is_global_admin: { Args: { _user_id: string }; Returns: boolean }
-      user_can_access_loja: {
-        Args: { _loja_id: string; _user_id: string }
+      fs_user_can_access_loja: {
+        Args: { _user_id: string; _loja_id: string }
         Returns: boolean
       }
-      user_can_manage_empresa: {
-        Args: { _empresa_id: string; _user_id: string }
+      fs_user_can_manage_loja: {
+        Args: { _user_id: string; _loja_id: string }
         Returns: boolean
       }
-      user_can_manage_loja: {
-        Args: { _loja_id: string; _user_id: string }
+      fs_is_admin: {
+        Args: { _user_id: string }
         Returns: boolean
-      }
-      user_has_empresa: {
-        Args: { _empresa_id: string; _user_id: string }
-        Returns: boolean
-      }
-      user_role_on_empresa: {
-        Args: { _empresa_id: string; _user_id: string }
-        Returns: Database["public"]["Enums"]["app_role"]
       }
     }
     Enums: {
-      app_role: "owner" | "admin" | "operador" | "viewer"
-      integration_status: "online" | "offline" | "erro" | "nao_configurado"
+      [_ in never]: never
     }
     CompositeTypes: {
       [_ in never]: never
@@ -304,7 +340,6 @@ export type Database = {
 }
 
 type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
-
 type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
 export type Tables<
@@ -422,9 +457,6 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {
-      app_role: ["owner", "admin", "operador", "viewer"],
-      integration_status: ["online", "offline", "erro", "nao_configurado"],
-    },
+    Enums: {},
   },
 } as const

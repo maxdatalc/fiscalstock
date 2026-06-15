@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+﻿import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { AppShell } from "@/components/AppShell";
@@ -52,7 +52,7 @@ import {
 import type { IntegrationStatusInfo } from "@/lib/api/integrations.functions";
 
 export const Route = createFileRoute("/configuracoes")({
-  head: () => ({ meta: [{ title: "Configurações — FiscalStock" }] }),
+  head: () => ({ meta: [{ title: "ConfiguraÃ§Ãµes â€” FiscalStock" }] }),
   component: Config,
 });
 
@@ -62,16 +62,16 @@ function Config() {
     <AppShell>
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-semibold">Configurações</h1>
+          <h1 className="text-2xl font-semibold">ConfiguraÃ§Ãµes</h1>
           <p className="text-sm text-muted-foreground">
-            Empresas, lojas, integrações, usuários, logs e contrato de integração.
+            Empresas, lojas, integraÃ§Ãµes, usuÃ¡rios, logs e contrato de integraÃ§Ã£o.
           </p>
         </div>
 
         {!canManageActiveCompany && (
           <div className="flex items-start gap-2 rounded-md border border-[color:var(--warning)]/30 bg-[color:var(--warning)]/5 p-3 text-sm">
             <ShieldAlert className="mt-0.5 h-4 w-4 text-[color:oklch(0.45_0.15_70)]" />
-            <p>Você está em modo somente leitura. Apenas owner/admin pode alterar configurações.</p>
+            <p>VocÃª estÃ¡ em modo somente leitura. Apenas owner/admin pode alterar configuraÃ§Ãµes.</p>
           </div>
         )}
 
@@ -79,7 +79,7 @@ function Config() {
           <TabsList className="flex w-full flex-wrap">
             <TabsTrigger value="empresas">Empresas & Lojas</TabsTrigger>
             <TabsTrigger value="logs">Logs</TabsTrigger>
-            <TabsTrigger value="contrato">Contrato de Integração</TabsTrigger>
+            <TabsTrigger value="contrato">Contrato de IntegraÃ§Ã£o</TabsTrigger>
           </TabsList>
 
           <TabsContent value="empresas">
@@ -256,8 +256,8 @@ function EmpresaAccordionItem({
     if (!isOpen || loaded) return;
     setLoading(true);
     Promise.all([
-      listLojas({ data: { empresa_id: empresa.id } }) as Promise<Loja[]>,
-      (listUsers({ data: { empresa_id: empresa.id } }) as Promise<UserVinculo[]>).catch(
+      listLojas({ data: { tenant_id: empresa.id } }) as Promise<Loja[]>,
+      (listUsers({ data: { tenant_id: empresa.id } }) as Promise<UserVinculo[]>).catch(
         () => [] as UserVinculo[],
       ),
     ])
@@ -285,7 +285,7 @@ function EmpresaAccordionItem({
       setNomeL("");
       setEmpIdL("");
       setTermL("");
-      const ls = (await listLojas({ data: { empresa_id: empresa.id } })) as Loja[];
+      const ls = (await listLojas({ data: { tenant_id: empresa.id } })) as Loja[];
       setLojas(ls);
       onReloadEmpresas();
     } catch (e) {
@@ -333,7 +333,7 @@ function EmpresaAccordionItem({
                     </DialogTrigger>
                     <DialogContent>
                       <DialogHeader>
-                        <DialogTitle>Nova loja — {empresa.nome_fantasia}</DialogTitle>
+                        <DialogTitle>Nova loja â€” {empresa.nome_fantasia}</DialogTitle>
                       </DialogHeader>
                       <div className="space-y-3">
                         <div>
@@ -392,10 +392,10 @@ function EmpresaAccordionItem({
 
             <div>
               <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Usuários vinculados
+                UsuÃ¡rios vinculados
               </p>
               {users.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Nenhum usuário vinculado.</p>
+                <p className="text-sm text-muted-foreground">Nenhum usuÃ¡rio vinculado.</p>
               ) : (
                 <Table>
                   <TableHeader>
@@ -446,7 +446,7 @@ function LojaCard({
     try {
       setStatus(await fetchStatus({ data: { loja_id: loja.id } }));
     } catch {
-      // loja pode não ter config ainda
+      // loja pode nÃ£o ter config ainda
     }
   }
 
@@ -477,17 +477,17 @@ function LojaCard({
                   variant={status.status_bridge === "online" ? "default" : "outline"}
                   className="text-xs"
                 >
-                  Bridge {status.status_bridge === "online" ? "✓" : "—"}
+                  Bridge {status.status_bridge === "online" ? "âœ“" : "â€”"}
                 </Badge>
                 <Badge
                   variant={status.status_maxapi === "online" ? "default" : "outline"}
                   className="text-xs"
                 >
-                  MaxAPI {status.status_maxapi === "online" ? "✓" : "—"}
+                  MaxAPI {status.status_maxapi === "online" ? "âœ“" : "â€”"}
                 </Badge>
               </>
             ) : (
-              <span className="text-xs text-muted-foreground">verificando…</span>
+              <span className="text-xs text-muted-foreground">verificandoâ€¦</span>
             )}
           </div>
         </div>
@@ -580,7 +580,7 @@ function LojaIntegrationPanel({
           terminal_maxdata: terminal || undefined,
         },
       });
-      toast.success("Configuração salva. Testando conexões…");
+      toast.success("ConfiguraÃ§Ã£o salva. Testando conexÃµesâ€¦");
       const [b, m] = await Promise.all([
         testBridge({ data: { loja_id } }).catch((e) => ({ status: "erro", mensagem: (e as Error).message })),
         testMax({ data: { loja_id } }).catch((e) => ({ status: "erro", mensagem: (e as Error).message })),
@@ -621,7 +621,7 @@ function LojaIntegrationPanel({
   return (
     <div className="space-y-4">
       <p className="text-sm font-medium text-muted-foreground">
-        Integração — {empresa_nome} / {loja_nome}
+        IntegraÃ§Ã£o â€” {empresa_nome} / {loja_nome}
       </p>
       <p className="text-xs text-muted-foreground">
         Tokens nunca aparecem no frontend. Para alterar o token da Bridge, digite um valor novo. Deixe vazio para preservar o atual.
@@ -631,10 +631,10 @@ function LojaIntegrationPanel({
           <p className="text-xs text-muted-foreground">Bridge SQL</p>
           <div className="flex items-center gap-2">
             <Badge variant={info?.status_bridge === "online" ? "default" : "outline"}>
-              {info?.status_bridge ?? "—"}
+              {info?.status_bridge ?? "â€”"}
             </Badge>
             <span className="text-xs text-muted-foreground">
-              {info?.bridge_configurada ? "configurada" : "não configurada"}
+              {info?.bridge_configurada ? "configurada" : "nÃ£o configurada"}
             </span>
           </div>
         </div>
@@ -642,10 +642,10 @@ function LojaIntegrationPanel({
           <p className="text-xs text-muted-foreground">MaxAPI</p>
           <div className="flex items-center gap-2">
             <Badge variant={info?.status_maxapi === "online" ? "default" : "outline"}>
-              {info?.status_maxapi ?? "—"}
+              {info?.status_maxapi ?? "â€”"}
             </Badge>
             <span className="text-xs text-muted-foreground">
-              {info?.maxapi_configurada ? "configurada" : "não configurada"}
+              {info?.maxapi_configurada ? "configurada" : "nÃ£o configurada"}
             </span>
           </div>
         </div>
@@ -659,14 +659,14 @@ function LojaIntegrationPanel({
           <div className="flex items-center justify-between">
             <Label>Token da Bridge</Label>
             {tokenConfigurado && (
-              <span className="text-xs font-medium text-[color:oklch(0.55_0.15_150)]">✓ Token já configurado</span>
+              <span className="text-xs font-medium text-[color:oklch(0.55_0.15_150)]">âœ“ Token jÃ¡ configurado</span>
             )}
           </div>
           <Input
             type="password"
             value={bridgeToken}
             onChange={(e) => setBridgeToken(e.target.value)}
-            placeholder={tokenConfigurado ? "••••••• (deixe vazio para não alterar)" : "Cole o token"}
+            placeholder={tokenConfigurado ? "â€¢â€¢â€¢â€¢â€¢â€¢â€¢ (deixe vazio para nÃ£o alterar)" : "Cole o token"}
             autoComplete="new-password"
           />
         </div>
@@ -686,7 +686,7 @@ function LojaIntegrationPanel({
         </div>
         <div className="flex flex-wrap gap-2">
           <Button onClick={handleSave} disabled={!canEdit || saving}>
-            {saving ? "Salvando…" : "Salvar e testar"}
+            {saving ? "Salvandoâ€¦" : "Salvar e testar"}
           </Button>
           <Button variant="outline" onClick={runBridge} disabled={!canEdit}>
             <RefreshCw className="mr-1 h-3.5 w-3.5" /> Testar Bridge
@@ -725,7 +725,7 @@ function LogsTab() {
 
   async function reload() {
     try {
-      setRows(await list({ data: { empresa_id: empresaAtiva?.id, loja_id: lojaAtiva?.id, limit: 200 } }));
+      setRows(await list({ data: { tenant_id: empresaAtiva?.id, loja_id: lojaAtiva?.id, limit: 200 } }));
     } catch (e) {
       console.error(e);
     }
@@ -743,14 +743,14 @@ function LogsTab() {
       </CardHeader>
       <CardContent>
         <Table>
-          <TableHeader><TableRow><TableHead>Data</TableHead><TableHead>Ação</TableHead><TableHead>Entidade</TableHead><TableHead>Loja</TableHead></TableRow></TableHeader>
+          <TableHeader><TableRow><TableHead>Data</TableHead><TableHead>AÃ§Ã£o</TableHead><TableHead>Entidade</TableHead><TableHead>Loja</TableHead></TableRow></TableHeader>
           <TableBody>
             {rows.map((l) => (
               <TableRow key={l.id}>
                 <TableCell className="text-xs">{new Date(l.created_at).toLocaleString("pt-BR")}</TableCell>
                 <TableCell className="font-mono text-xs">{l.acao}</TableCell>
-                <TableCell className="text-xs">{l.entidade ?? "—"}</TableCell>
-                <TableCell className="text-xs">{l.loja_id?.slice(0, 8) ?? "—"}</TableCell>
+                <TableCell className="text-xs">{l.entidade ?? "â€”"}</TableCell>
+                <TableCell className="text-xs">{l.loja_id?.slice(0, 8) ?? "â€”"}</TableCell>
               </TableRow>
             ))}
             {rows.length === 0 && (
@@ -769,29 +769,30 @@ function ContratoTab() {
       <CardHeader>
         <div className="flex items-center gap-2">
           <FileText className="h-4 w-4 text-primary" />
-          <CardTitle className="text-base">Contrato de Integração (handoff Lovable → Claude Code)</CardTitle>
+          <CardTitle className="text-base">Contrato de IntegraÃ§Ã£o (handoff Lovable â†’ Claude Code)</CardTitle>
         </div>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
         <p>
-          Esta aba documenta o contrato entre o frontend (Lovable) e a camada de integração real (Claude Code). O documento completo vive em{" "}
+          Esta aba documenta o contrato entre o frontend (Lovable) e a camada de integraÃ§Ã£o real (Claude Code). O documento completo vive em{" "}
           <code className="rounded bg-muted px-1.5 py-0.5 text-xs">docs/lovable-claude-handoff.md</code>.
         </p>
         <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
-          <li>Server functions são o único ponto de chamada do frontend.</li>
-          <li>Bridge SQL é interna e só acessada pelo backend, via queries nomeadas.</li>
+          <li>Server functions sÃ£o o Ãºnico ponto de chamada do frontend.</li>
+          <li>Bridge SQL Ã© interna e sÃ³ acessada pelo backend, via queries nomeadas.</li>
           <li>Escritas em O.S. devem ocorrer somente pela MaxAPI (nunca SQL direto).</li>
           <li>Tokens/segredos nunca trafegam pro frontend.</li>
-          <li>O cálculo fiscal atual é simulado e aguarda validação contra o MaxManager.</li>
+          <li>O cÃ¡lculo fiscal atual Ã© simulado e aguarda validaÃ§Ã£o contra o MaxManager.</li>
         </ul>
         <p className="text-xs text-muted-foreground">
           Quando o Claude conectar a Bridge/MaxAPI reais, basta trocar
           <code className="mx-1 rounded bg-muted px-1">MockStockService</code> /
           <code className="mx-1 rounded bg-muted px-1">MockServiceOrderService</code>
           por suas variantes <code className="mx-1 rounded bg-muted px-1">Server*</code>
-          no arquivo de adapter — sem alterar nenhuma tela.
+          no arquivo de adapter â€” sem alterar nenhuma tela.
         </p>
       </CardContent>
     </Card>
   );
 }
+

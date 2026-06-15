@@ -1,4 +1,4 @@
-import { createServerFn } from "@tanstack/react-start";
+﻿import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
@@ -64,7 +64,7 @@ async function assertLojaAccess(
   userId: string,
   loja_id: string,
 ) {
-  const { data: ok } = await supabase.rpc("user_can_access_loja", {
+  const { data: ok } = await supabase.rpc("fs_user_can_access_loja", {
     _user_id: userId,
     _loja_id: loja_id,
   });
@@ -72,28 +72,18 @@ async function assertLojaAccess(
 }
 
 async function getLojaConfigs(supabaseAdmin: SupabaseClient<Database>, lojaId: string) {
-  const [{ data: loja }, { data: cfg }] = await Promise.all([
-    supabaseAdmin
-      .from("lojas")
-      .select("emp_id_maxdata")
-      .eq("id", lojaId)
-      .maybeSingle(),
-    supabaseAdmin
-      .from("integration_configs")
-      .select("bridge_url, bridge_token")
-      .eq("loja_id", lojaId)
-      .maybeSingle(),
-  ]);
+  const { data: loja } = await supabaseAdmin
+    .from("lojas")
+    .select("emp_id, sql_bridge_url, sql_bridge_token")
+    .eq("id", lojaId)
+    .maybeSingle();
 
-  if (!loja?.emp_id_maxdata) throw new Error("Loja sem emp_id_maxdata configurado");
-
-  const empId = parseInt(loja.emp_id_maxdata, 10);
-
-  if (!cfg?.bridge_url || !cfg?.bridge_token)
+  if (!loja?.emp_id) throw new Error("Loja sem emp_id configurado");
+  if (!loja.sql_bridge_url || !loja.sql_bridge_token)
     throw new Error("Bridge SQL não configurada para esta loja");
-  const bridge: BridgeConfig = { url: cfg.bridge_url, token: cfg.bridge_token };
 
-  return { empId, bridge };
+  const bridge: BridgeConfig = { url: loja.sql_bridge_url, token: loja.sql_bridge_token };
+  return { empId: loja.emp_id, bridge };
 }
 
 // ---------------------------------------------------------------------------

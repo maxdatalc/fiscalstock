@@ -29,46 +29,66 @@ export type UserContext = {
 export const getCurrentUserContext = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<UserContext> => {
-    const { supabase, userId } = context;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { userId } = context;
 
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("nome,email,role")
+    // fs_profiles: perfil FiscalStock do usuário
+    const { data: profile } = await supabaseAdmin
+      .from("fs_profiles")
+      .select("nome,email,role,ativo")
       .eq("user_id", userId)
       .maybeSingle();
 
     const isAdmin = profile?.role === "owner" || profile?.role === "admin";
 
-    // Empresas visíveis ao usuário (via RLS)
-    const { data: empresasRows } = await supabase
-      .from("empresas")
-      .select("id,nome_fantasia,razao_social,cnpj,ativo")
-      .order("nome_fantasia");
+    // tenant_users: de quais tenants (= empresas) o usuário faz parte
+    const { data: vinculos } = await supabaseAdmin
+      .from("tenant_users")
+      .select("tenant_id,role")
+      .eq("user_id", userId);
 
-    const empresaIds = (empresasRows ?? []).map((e) => e.id);
+    const tenantIds = (vinculos ?? []).map((v) => v.tenant_id);
 
-    const { data: vinculos } = empresaIds.length
-      ? await supabase
-          .from("user_empresas")
-          .select("empresa_id,role_na_empresa")
-          .eq("user_id", userId)
-          .in("empresa_id", empresaIds)
-      : { data: [] as Array<{ empresa_id: string; role_na_empresa: string }> };
+    // tenants: dados das empresas (name, is_active)
+    const { data: tenantsRows } = tenantIds.length
+      ? await supabaseAdmin
+          .from("tenants")
+          .select("id,name,is_active")
+          .in("id", tenantIds)
+          .eq("is_active", true)
+          .order("name")
+      : { data: [] as Array<{ id: string; name: string; is_active: boolean }> };
 
-    const { data: lojas } = empresaIds.length
-      ? await supabase
+    // lojas: usando colunas do dashboard (name, emp_id, tenant_id, is_active)
+    // terminal_maxdata foi adicionado via ALTER TABLE (migração)
+    const { data: lojas } = tenantIds.length
+      ? await supabaseAdmin
           .from("lojas")
-          .select("id,empresa_id,nome,emp_id_maxdata,terminal_maxdata,ativo")
-          .in("empresa_id", empresaIds)
-          .order("nome")
-      : { data: [] as LojaContext[] };
+          .select("id,tenant_id,name,emp_id,terminal_maxdata,is_active")
+          .in("tenant_id", tenantIds)
+          .eq("is_active", true)
+          .order("name")
+      : { data: [] as Array<{ id: string; tenant_id: string; name: string; emp_id: number; terminal_maxdata: string | null; is_active: boolean }> };
 
-    const roleMap = new Map((vinculos ?? []).map((v) => [v.empresa_id, v.role_na_empresa]));
+    const roleMap = new Map((vinculos ?? []).map((v) => [v.tenant_id, v.role]));
 
-    const empresas: EmpresaContext[] = (empresasRows ?? []).map((e) => ({
-      ...e,
-      role_na_empresa: roleMap.get(e.id) ?? (isAdmin ? (profile?.role ?? "admin") : "viewer"),
-      lojas: (lojas ?? []).filter((l) => l.empresa_id === e.id),
+    const empresas: EmpresaContext[] = (tenantsRows ?? []).map((t) => ({
+      id: t.id,
+      nome_fantasia: t.name,
+      razao_social: null,
+      cnpj: null,
+      ativo: t.is_active,
+      role_na_empresa: roleMap.get(t.id) ?? (isAdmin ? (profile?.role ?? "admin") : "viewer"),
+      lojas: (lojas ?? [])
+        .filter((l) => l.tenant_id === t.id)
+        .map((l): LojaContext => ({
+          id: l.id,
+          empresa_id: l.tenant_id,
+          nome: l.name,
+          emp_id_maxdata: String(l.emp_id),
+          terminal_maxdata: l.terminal_maxdata ?? "1",
+          ativo: l.is_active,
+        })),
     }));
 
     return {
