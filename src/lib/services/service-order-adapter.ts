@@ -76,8 +76,10 @@ export class ServerServiceOrderService implements IServiceOrderService {
       placa: string;
       status: string;
       dataAbertura: string | null;
-      obs: string;
+      equipamento: string;
+      marca: string;
       defeito: string;
+      obs: string;
     }>;
     return rows.map(
       (o): OrdemServico => ({
@@ -89,8 +91,10 @@ export class ServerServiceOrderService implements IServiceOrderService {
         status: mapStatus(o.status),
         empresaId: "",
         itens: [],
-        obs: o.obs,
+        equipamento: o.equipamento,
+        marca: o.marca,
         defeito: o.defeito,
+        obs: o.obs,
       }),
     );
   }
@@ -109,8 +113,10 @@ export class ServerServiceOrderService implements IServiceOrderService {
         placa: string;
         status: string;
         dataAbertura: string | null;
-        obs: string;
+        equipamento: string;
+        marca: string;
         defeito: string;
+        obs: string;
         laudoTec: string;
       };
       const items = itemRows as unknown as Array<{
@@ -141,8 +147,10 @@ export class ServerServiceOrderService implements IServiceOrderService {
           precoUnitario: r.precoUnitario,
           total: r.total,
         })),
-        obs: d.obs,
+        equipamento: d.equipamento,
+        marca: d.marca,
         defeito: d.defeito,
+        obs: d.obs,
         laudoTec: d.laudoTec,
       };
     } catch {

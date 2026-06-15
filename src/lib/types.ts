@@ -38,6 +38,8 @@ export type OrdemServico = {
   status: "aberta" | "em_andamento" | "faturada" | "cancelada";
   empresaId: string;
   itens: ItemOS[];
+  equipamento?: string;
+  marca?: string;
   obs?: string;
   defeito?: string;
   laudoTec?: string;

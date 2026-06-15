@@ -161,6 +161,14 @@ function OSDetailContent() {
                 {" "}• Placa <span className="font-mono text-foreground">{os.placa}</span>
               </>
             )}
+            {(os.equipamento || os.marca) && (
+              <>
+                {" "}•{" "}
+                <span className="text-foreground">
+                  {[os.marca, os.equipamento].filter(Boolean).join(" ")}
+                </span>
+              </>
+            )}
             {" "}• {new Date(os.data).toLocaleDateString("pt-BR")}
           </p>
         </div>
@@ -169,9 +177,19 @@ function OSDetailContent() {
         </Button>
       </div>
 
-      {(os.defeito || os.obs || os.laudoTec) && (
+      {(os.defeito || os.obs || os.laudoTec || os.equipamento || os.marca) && (
         <Card>
-          <CardContent className="grid gap-4 pt-4 sm:grid-cols-3">
+          <CardContent className="grid gap-4 pt-4 sm:grid-cols-2 lg:grid-cols-4">
+            {(os.equipamento || os.marca) && (
+              <div>
+                <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Equipamento
+                </p>
+                <p className="text-sm font-medium">
+                  {[os.marca, os.equipamento].filter(Boolean).join(" — ")}
+                </p>
+              </div>
+            )}
             {os.defeito && (
               <div>
                 <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -180,20 +198,22 @@ function OSDetailContent() {
                 <p className="text-sm">{os.defeito}</p>
               </div>
             )}
-            {os.obs && (
-              <div>
-                <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Observações
-                </p>
-                <p className="text-sm">{os.obs}</p>
-              </div>
-            )}
             {os.laudoTec && (
               <div>
                 <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   Laudo técnico
                 </p>
                 <p className="text-sm">{os.laudoTec}</p>
+              </div>
+            )}
+            {os.obs && (
+              <div className="sm:col-span-2 lg:col-span-1">
+                <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Observações
+                </p>
+                <p className="max-h-24 overflow-y-auto whitespace-pre-wrap text-sm text-muted-foreground">
+                  {os.obs}
+                </p>
               </div>
             )}
           </CardContent>

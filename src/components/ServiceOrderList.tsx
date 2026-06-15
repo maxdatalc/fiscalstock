@@ -45,6 +45,11 @@ export function ServiceOrderList({ ordens }: { ordens: OrdemServico[] }) {
                   {new Date(os.data).toLocaleDateString("pt-BR")}
                 </TableCell>
                 <TableCell className="max-w-xs">
+                  {(os.equipamento || os.marca) && (
+                    <p className="truncate text-xs font-medium text-foreground">
+                      {[os.marca, os.equipamento].filter(Boolean).join(" ")}
+                    </p>
+                  )}
                   {preview ? (
                     <span
                       className="block truncate text-sm text-muted-foreground"
