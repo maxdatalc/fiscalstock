@@ -386,6 +386,248 @@ ON CONFLICT (loja_id) DO UPDATE SET maxapi_url = EXCLUDED.maxapi_url;
 
 ---
 
+## 10. MaxAPI — Como acessar e gerenciar autenticação
+
+### 10.1 Visão geral
+
+A MaxAPI é a API REST oficial do MaxData para **escrita de dados** (criar OS, adicionar itens, cancelar itens). Leitura de dados é feita pela Bridge SQL — nunca pela MaxAPI para dados que o Bridge cobre.
+
+```
+URL base:  https://lucasbatauto.lcgestor.com.br
+Auth:      POST /v2/auth → JWT Bearer token
+TTL JWT:   3600 segundos (1 hora exata)
+Cache app: 3000 segundos (50 min) — 10 min de margem de segurança
+```
+
+**Importante — confirmado por testes live (2026-06-14):**
+- Nenhum header `CF-Access-Client-Id` ou `CF-Access-Client-Secret` é necessário
+- O body de auth usa `empid` em **minúsculo** (não `empId`)
+- A paginação retorna os dados em `docs` (não `items` nem `data`)
+- `GET /v2/serviceorder/items?OsId=X` retorna **405** — itens de OS só via Bridge SQL
+
+---
+
+### 10.2 Fluxo de autenticação e ciclo de vida do token
+
+```
+┌─────────────────────────────────────────────────────┐
+│  Server Function (server-side only)                 │
+│                                                     │
+│  1. Busca token no Supabase                         │
+│     integration_configs.maxapi_token_cache          │
+│     integration_configs.maxapi_token_expires_at     │
+│                                                     │
+│  2a. Token válido? → usa direto                     │
+│                                                     │
+│  2b. Expirado ou ausente?                           │
+│      POST /v2/auth { empid, terminal } → JWT        │
+│      Salva em integration_configs (TTL 3000s)       │
+│                                                     │
+│  3. Faz requisição com Authorization: Bearer {JWT}  │
+│                                                     │
+│  4. Recebe 401? → invalida cache, refaz auth (1x)   │
+│     Se 401 de novo → lança erro para o usuário      │
+└─────────────────────────────────────────────────────┘
+```
+
+**Arquivo que implementa esse fluxo:** `src/lib/maxapi/maxapi-client.ts`
+
+Funções relevantes:
+- `fetchNewToken(config)` — faz o `POST /v2/auth`, nunca chame diretamente
+- `getOrRefreshToken(config, supabaseAdmin, lojaId)` — ponto de entrada do cache
+- `maxApiRequest(...)` — toda requisição passa por aqui, com auto-refresh em 401
+
+---
+
+### 10.3 Testar a autenticação manualmente
+
+**Obter um token JWT (substitua `empid` e `terminal` conforme a loja):**
+```bash
+curl -s -X POST https://lucasbatauto.lcgestor.com.br/v2/auth \
+  -H "Content-Type: application/json" \
+  -d '{
+    "empid": 1,
+    "terminal": "0A285A0A41A6472F300BE37FE6680720"
+  }'
+```
+
+**Resposta esperada:**
+```json
+{
+  "application": "MaxData",
+  "empId": 1,
+  "expiration": "2026-06-15T20:39:18.22-03:00",
+  "idUser": 42,
+  "terminal": "0A285A0A41A6472F300BE37FE6680720",
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+Salve o `token` para usar nas requisições abaixo. O campo `expiration` marca o TTL real do JWT (3600s desde a emissão).
+
+---
+
+### 10.4 Endpoints confirmados — com exemplos curl
+
+Substitua `$TOKEN` pelo JWT obtido no §10.3.
+
+**Listar Ordens de Serviço:**
+```bash
+curl -s "https://lucasbatauto.lcgestor.com.br/v2/serviceorder" \
+  -H "Authorization: Bearer $TOKEN"
+# Retorna: { docs: [...], total, limit, page, pages }
+```
+
+**Listar OS filtradas por status:**
+```bash
+curl -s "https://lucasbatauto.lcgestor.com.br/v2/serviceorder?status=pendente" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Detalhe de uma OS específica (osId = número da OS):**
+```bash
+curl -s "https://lucasbatauto.lcgestor.com.br/v2/serviceorder/12345" \
+  -H "Authorization: Bearer $TOKEN"
+# Retorna objeto direto (não paginado)
+```
+
+**Buscar produto por descrição:**
+```bash
+curl -s "https://lucasbatauto.lcgestor.com.br/v2/product?descricao=FILTRO" \
+  -H "Authorization: Bearer $TOKEN"
+# Retorna: { docs: [...], total, limit, page, pages }
+```
+
+**Detalhe de um produto:**
+```bash
+curl -s "https://lucasbatauto.lcgestor.com.br/v2/product/15788" \
+  -H "Authorization: Bearer $TOKEN"
+# Campo "estoque" = estoque físico para o empId do JWT
+```
+
+**Criar uma Ordem de Serviço:**
+```bash
+curl -s -X POST "https://lucasbatauto.lcgestor.com.br/v2/serviceorder" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "clienteNome": "João Silva",
+    "defeito": "Troca de óleo",
+    "equipamento": "Gol 2020",
+    "marca": "VW"
+  }'
+```
+
+**Adicionar item a uma OS:**
+```bash
+curl -s -X POST "https://lucasbatauto.lcgestor.com.br/v2/serviceorder/items" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "OsId": 12345,
+    "produtoId": 15788,
+    "produtoDescricao": "FILTRO DE ÓLEO",
+    "qtde": 1,
+    "valor": 29.90,
+    "tipo": "P"
+  }'
+```
+
+**Cancelar item de uma OS:**
+```bash
+curl -s -X DELETE "https://lucasbatauto.lcgestor.com.br/v2/serviceorder/items/67890" \
+  -H "Authorization: Bearer $TOKEN"
+# Retorna 204 No Content em sucesso
+```
+
+**❌ NÃO EXISTE — retorna 405:**
+```bash
+# Itens de OS NÃO podem ser lidos pela MaxAPI
+curl "https://lucasbatauto.lcgestor.com.br/v2/serviceorder/items?OsId=12345"
+# → 405 Method Not Allowed
+# Use Bridge SQL (vendaItem) para ler itens de OS
+```
+
+---
+
+### 10.5 Gerenciamento do cache de token no Supabase
+
+O token JWT fica armazenado em `integration_configs` por loja:
+
+```sql
+-- Ver estado atual do cache de uma loja
+SELECT
+  loja_id,
+  LEFT(maxapi_token_cache, 20) || '...' AS token_preview,
+  maxapi_token_expires_at,
+  CASE
+    WHEN maxapi_token_expires_at > NOW() THEN 'VÁLIDO'
+    ELSE 'EXPIRADO'
+  END AS status_cache,
+  status_maxapi,
+  ultimo_teste_maxapi
+FROM integration_configs
+WHERE loja_id = '<uuid-da-loja>';
+```
+
+**Forçar renovação do token (invalidar cache manualmente):**
+```sql
+UPDATE integration_configs
+SET
+  maxapi_token_cache      = NULL,
+  maxapi_token_expires_at = NULL
+WHERE loja_id = '<uuid-da-loja>';
+```
+
+Após isso, a próxima requisição à MaxAPI irá buscar um token novo automaticamente.
+
+**O sistema invalida o cache automaticamente quando:**
+1. `maxapi_token_expires_at` está no passado (expirou os 3000s de cache)
+2. A API retorna HTTP 401 (token rejeitado antes do esperado)
+3. O usuário salva uma nova configuração de `maxapi_url` ou `terminal_maxdata`
+
+---
+
+### 10.6 Campos do token e como interpretar
+
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| `token` | string | JWT Bearer — usar no header `Authorization: Bearer {token}` |
+| `expiration` | string ISO | Quando o JWT expira no servidor MaxData (3600s após emissão) |
+| `empId` | number | ID da empresa autenticada (confirma qual empresa o token representa) |
+| `terminal` | string | Terminal MaxData que gerou o token |
+| `idUser` | number | ID do usuário MaxData vinculado ao terminal |
+| `application` | string | Sempre `"MaxData"` |
+
+**Atenção:** O `expiration` do JWT é 3600s, mas o app usa 3000s (50 min) como TTL de cache para evitar usar um token prestes a expirar. Nunca use o `expiration` direto — confie no `maxapi_token_expires_at` do Supabase.
+
+---
+
+### 10.7 Tipos TypeScript dos payloads MaxAPI
+
+**Arquivo:** `src/lib/maxapi/maxapi-types.ts`
+
+Tipos disponíveis:
+- `TokenDto` — resposta do POST /v2/auth
+- `ServiceOrder` — OS completa (leitura)
+- `ServiceOrderBody` — payload para criar OS
+- `ServiceOrderItem` — payload para adicionar item
+- `MaxApiProduct` — produto com estoque físico
+- `MaxApiPaginated<T>` — wrapper de paginação `{ docs, total, limit, page, pages }`
+- `MaxApiError` — shape de erro `{ message, success, statusCode }`
+
+---
+
+### 10.8 Regras de segurança da MaxAPI (imutáveis)
+
+1. **Token nunca vai ao frontend** — `maxapi_token_cache` é lido apenas em server functions
+2. **Token nunca aparece em logs** — não use `console.log(token)` em nenhuma circunstância
+3. **Toda escrita vai pela MaxAPI** — nunca `INSERT`/`UPDATE` direto no SQL Server via Bridge
+4. **Cache no Supabase, não em memória** — garante que múltiplas instâncias do servidor compartilham o mesmo token sem race conditions
+5. **Auto-refresh em 401** — implementado em `maxApiRequest()` com uma única tentativa de renovação
+
+---
+
 ## 9. Status atual do projeto (2026-06-15)
 
 | Funcionalidade | Status |
