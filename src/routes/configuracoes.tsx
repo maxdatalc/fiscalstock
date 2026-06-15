@@ -33,7 +33,7 @@ import {
 } from "@/components/ui/dialog";
 import { FileText, Plus, RefreshCw, Settings2, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
-import { useAuth } from "@/lib/auth-context";
+import { useFiscalAuth } from "@/lib/fiscal-auth-context";
 import {
   listEmpresasAdmin,
   createEmpresa,
@@ -57,7 +57,7 @@ export const Route = createFileRoute("/configuracoes")({
 });
 
 function Config() {
-  const { canManageActiveCompany, isGlobalAdmin } = useAuth();
+  const { canManageActiveCompany, isGlobalAdmin } = useFiscalAuth();
   return (
     <AppShell>
       <div className="space-y-6">
@@ -719,7 +719,7 @@ function LojaIntegrationPanel({
 }
 
 function LogsTab() {
-  const { empresaAtiva, lojaAtiva } = useAuth();
+  const { empresaAtiva, lojaAtiva } = useFiscalAuth();
   const list = useServerFn(listAuditLogs);
   const [rows, setRows] = useState<Array<{ id: string; created_at: string; acao: string; entidade: string | null; loja_id: string | null; user_id: string | null }>>([]);
 
@@ -795,4 +795,5 @@ function ContratoTab() {
     </Card>
   );
 }
+
 

@@ -1,4 +1,4 @@
-import { createFileRoute, useRouter } from "@tanstack/react-router";
+﻿import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { RequireLoja } from "@/components/RequireLoja";
@@ -20,11 +20,11 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { useAuth } from "@/lib/auth-context";
+import { useFiscalAuth } from "@/lib/fiscal-auth-context";
 import type { OrdemServico } from "@/lib/types";
 
 export const Route = createFileRoute("/ordens/$id")({
-  head: () => ({ meta: [{ title: "O.S — FiscalStock" }] }),
+  head: () => ({ meta: [{ title: "O.S â€” FiscalStock" }] }),
   component: OSDetail,
 });
 
@@ -54,9 +54,9 @@ function OSDetail() {
 function OSDetailContent() {
   const { id } = Route.useParams();
   const router = useRouter();
-  const { lojaAtiva } = useAuth();
+  const { lojaAtiva } = useFiscalAuth();
   const [os, setOs] = useState<OrdemServico | null>(null);
-  const [loading, setLoading] = useState(true); // true desde o inicio — skeleton aparece imediatamente
+  const [loading, setLoading] = useState(true); // true desde o inicio â€” skeleton aparece imediatamente
   const [open, setOpen] = useState(false);
   const [reload, setReload] = useState(0);
   const [confirmacao, setConfirmacao] = useState<
@@ -111,9 +111,9 @@ function OSDetailContent() {
         </Button>
         <Card>
           <CardContent className="py-10 text-center">
-            <p className="text-sm font-medium">Ordem de serviço não encontrada</p>
+            <p className="text-sm font-medium">Ordem de serviÃ§o nÃ£o encontrada</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              O.S #{id} não existe nesta loja ou foi excluída.
+              O.S #{id} nÃ£o existe nesta loja ou foi excluÃ­da.
             </p>
           </CardContent>
         </Card>
@@ -134,7 +134,7 @@ function OSDetailContent() {
         forcar_sem_fiscal: forcar,
       });
       if (r.ok) {
-        toast.success(r.alerta ? `Item adicionado. ${r.alerta}` : "Item adicionado à O.S.");
+        toast.success(r.alerta ? `Item adicionado. ${r.alerta}` : "Item adicionado Ã  O.S.");
         setReload((x) => x + 1);
         setConfirmacao(null);
         return;
@@ -143,7 +143,7 @@ function OSDetailContent() {
         setConfirmacao({ alerta: r.alerta ?? "Estoque fiscal insuficiente.", item });
         return;
       }
-      toast.error(r.alerta ?? "Operação bloqueada pelo controle fiscal.");
+      toast.error(r.alerta ?? "OperaÃ§Ã£o bloqueada pelo controle fiscal.");
       setConfirmacao(null);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Falha ao adicionar item.");
@@ -172,18 +172,18 @@ function OSDetailContent() {
             Cliente <span className="font-medium text-foreground">{os.cliente}</span>
             {os.placa && (
               <>
-                {" "}• Placa <span className="font-mono text-foreground">{os.placa}</span>
+                {" "}â€¢ Placa <span className="font-mono text-foreground">{os.placa}</span>
               </>
             )}
             {(os.equipamento || os.marca) && (
               <>
-                {" "}•{" "}
+                {" "}â€¢{" "}
                 <span className="text-foreground">
                   {[os.marca, os.equipamento].filter(Boolean).join(" ")}
                 </span>
               </>
             )}
-            {" "}• {new Date(os.data).toLocaleDateString("pt-BR")}
+            {" "}â€¢ {new Date(os.data).toLocaleDateString("pt-BR")}
           </p>
         </div>
         <Button onClick={() => setOpen(true)}>
@@ -200,7 +200,7 @@ function OSDetailContent() {
                   Equipamento
                 </p>
                 <p className="text-sm font-medium">
-                  {[os.marca, os.equipamento].filter(Boolean).join(" — ")}
+                  {[os.marca, os.equipamento].filter(Boolean).join(" â€” ")}
                 </p>
               </div>
             )}
@@ -215,7 +215,7 @@ function OSDetailContent() {
             {os.laudoTec && (
               <div>
                 <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Laudo técnico
+                  Laudo tÃ©cnico
                 </p>
                 <p className="text-sm">{os.laudoTec}</p>
               </div>
@@ -223,7 +223,7 @@ function OSDetailContent() {
             {os.obs && (
               <div className="sm:col-span-2 lg:col-span-1">
                 <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Observações
+                  ObservaÃ§Ãµes
                 </p>
                 <p className="max-h-24 overflow-y-auto whitespace-pre-wrap text-sm text-muted-foreground">
                   {os.obs}
@@ -242,7 +242,7 @@ function OSDetailContent() {
               {os.itens.length} {os.itens.length === 1 ? "item" : "itens"}
               {totalItens > 0 && (
                 <>
-                  {" "}•{" "}
+                  {" "}â€¢{" "}
                   <span className="font-medium text-foreground">
                     {totalItens.toLocaleString("pt-BR", {
                       style: "currency",
@@ -258,11 +258,11 @@ function OSDetailContent() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-28">Código</TableHead>
+                <TableHead className="w-28">CÃ³digo</TableHead>
                 <TableHead>Produto</TableHead>
                 <TableHead className="w-16 text-right">Un</TableHead>
                 <TableHead className="w-24 text-right">Qtde</TableHead>
-                <TableHead className="w-32 text-right">Preço unit.</TableHead>
+                <TableHead className="w-32 text-right">PreÃ§o unit.</TableHead>
                 <TableHead className="w-32 text-right">Total</TableHead>
               </TableRow>
             </TableHeader>
@@ -272,7 +272,7 @@ function OSDetailContent() {
                   <TableCell className="font-mono text-sm">{it.codigo}</TableCell>
                   <TableCell>{it.produtoNome}</TableCell>
                   <TableCell className="text-right text-sm text-muted-foreground">
-                    {it.unidade ?? "—"}
+                    {it.unidade ?? "â€”"}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">{it.quantidade}</TableCell>
                   <TableCell className="text-right tabular-nums text-sm">
@@ -281,12 +281,12 @@ function OSDetailContent() {
                           style: "currency",
                           currency: "BRL",
                         })
-                      : "—"}
+                      : "â€”"}
                   </TableCell>
                   <TableCell className="text-right tabular-nums text-sm font-medium">
                     {it.total != null
                       ? it.total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
-                      : "—"}
+                      : "â€”"}
                   </TableCell>
                 </TableRow>
               ))}
@@ -316,10 +316,10 @@ function OSDetailContent() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2 text-destructive">
-              <AlertTriangle className="h-5 w-5" /> Confirmar inclusão com risco fiscal
+              <AlertTriangle className="h-5 w-5" /> Confirmar inclusÃ£o com risco fiscal
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {confirmacao?.alerta} Deseja prosseguir mesmo assim? Esta ação será registrada no log
+              {confirmacao?.alerta} Deseja prosseguir mesmo assim? Esta aÃ§Ã£o serÃ¡ registrada no log
               de auditoria.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -337,3 +337,4 @@ function OSDetailContent() {
     </div>
   );
 }
+

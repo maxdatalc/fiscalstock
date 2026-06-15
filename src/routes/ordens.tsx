@@ -1,4 +1,4 @@
-import { createFileRoute, Outlet, useRouterState } from "@tanstack/react-router";
+﻿import { createFileRoute, Outlet, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { ServiceOrderList } from "@/components/ServiceOrderList";
@@ -8,11 +8,11 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus } from "lucide-react";
 import { serviceOrderService } from "@/lib/services/service-order-adapter";
-import { useAuth } from "@/lib/auth-context";
+import { useFiscalAuth } from "@/lib/fiscal-auth-context";
 import type { OrdemServico } from "@/lib/types";
 
 export const Route = createFileRoute("/ordens")({
-  head: () => ({ meta: [{ title: "Ordens de Serviço — FiscalStock" }] }),
+  head: () => ({ meta: [{ title: "Ordens de ServiÃ§o â€” FiscalStock" }] }),
   component: OrdensLayout,
 });
 
@@ -23,7 +23,7 @@ function OrdensLayout() {
 }
 
 function OrdensIndex() {
-  const { lojaAtiva } = useAuth();
+  const { lojaAtiva } = useFiscalAuth();
   const [ordens, setOrdens] = useState<OrdemServico[]>([]);
   const [loading, setLoading] = useState(true);
   const [cliente, setCliente] = useState("");
@@ -53,7 +53,7 @@ function OrdensIndex() {
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-semibold">Ordens de Serviço</h1>
+              <h1 className="text-2xl font-semibold">Ordens de ServiÃ§o</h1>
               <p className="text-sm text-muted-foreground">
                 Gerencie O.S e adicione itens com checagem fiscal.
               </p>

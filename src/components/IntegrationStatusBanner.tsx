@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Card, CardContent } from "@/components/ui/card";
 import { Wifi, WifiOff, AlertTriangle, Database, Server, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/lib/auth-context";
+import { useFiscalAuth } from "@/lib/fiscal-auth-context";
 import { getIntegrationStatus, type IntegrationStatusInfo } from "@/lib/api/integrations.functions";
 
 function StatusPill({ label, status, icon }: { label: string; status: string; icon: React.ReactNode }) {
@@ -11,7 +11,7 @@ function StatusPill({ label, status, icon }: { label: string; status: string; ic
     online: { cls: "text-[color:var(--success)]", text: "Online", Icon: Wifi },
     offline: { cls: "text-destructive", text: "Offline", Icon: WifiOff },
     erro: { cls: "text-destructive", text: "Erro", Icon: AlertTriangle },
-    nao_configurado: { cls: "text-muted-foreground", text: "Não configurada", Icon: AlertTriangle },
+    nao_configurado: { cls: "text-muted-foreground", text: "NÃ£o configurada", Icon: AlertTriangle },
   };
   const m = map[status] ?? map.nao_configurado;
   const Ico = m.Icon;
@@ -29,7 +29,7 @@ function StatusPill({ label, status, icon }: { label: string; status: string; ic
 }
 
 export function IntegrationStatusBanner() {
-  const { lojaAtiva, empresaAtiva } = useAuth();
+  const { lojaAtiva, empresaAtiva } = useFiscalAuth();
   const fetchStatus = useServerFn(getIntegrationStatus);
   const [info, setInfo] = useState<IntegrationStatusInfo | null>(null);
   const [loading, setLoading] = useState(false);
@@ -51,8 +51,8 @@ export function IntegrationStatusBanner() {
   if (!lojaAtiva) return null;
 
   const naoConfigurada = !info || (!info.bridge_configurada && !info.maxapi_configurada);
-  const lastBridge = info?.ultimo_teste_bridge ? new Date(info.ultimo_teste_bridge).toLocaleString("pt-BR") : "—";
-  const lastMax = info?.ultimo_teste_maxapi ? new Date(info.ultimo_teste_maxapi).toLocaleString("pt-BR") : "—";
+  const lastBridge = info?.ultimo_teste_bridge ? new Date(info.ultimo_teste_bridge).toLocaleString("pt-BR") : "â€”";
+  const lastMax = info?.ultimo_teste_maxapi ? new Date(info.ultimo_teste_maxapi).toLocaleString("pt-BR") : "â€”";
 
   return (
     <Card className="border-l-4 border-l-primary">
@@ -64,11 +64,11 @@ export function IntegrationStatusBanner() {
             <p className="text-xs uppercase tracking-wide text-muted-foreground">Loja ativa</p>
             <p className="text-sm font-medium">{lojaAtiva.nome}</p>
             <p className="text-[11px] text-muted-foreground">
-              empId {lojaAtiva.emp_id_maxdata} • term {lojaAtiva.terminal_maxdata} • {empresaAtiva?.nome_fantasia}
+              empId {lojaAtiva.emp_id_maxdata} â€¢ term {lojaAtiva.terminal_maxdata} â€¢ {empresaAtiva?.nome_fantasia}
             </p>
           </div>
           <div className="rounded-md border bg-card px-3 py-2">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">Último teste</p>
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Ãšltimo teste</p>
             <p className="text-xs">Bridge: {lastBridge}</p>
             <p className="text-xs">MaxAPI: {lastMax}</p>
           </div>
@@ -76,7 +76,7 @@ export function IntegrationStatusBanner() {
         <div className="flex items-center gap-2">
           {naoConfigurada && (
             <span className="flex items-center gap-1 text-xs text-[color:oklch(0.55_0.17_70)]">
-              <AlertTriangle className="h-4 w-4" /> Integração ainda não configurada.
+              <AlertTriangle className="h-4 w-4" /> IntegraÃ§Ã£o ainda nÃ£o configurada.
             </span>
           )}
           <Button variant="outline" size="sm" onClick={load} disabled={loading}>
