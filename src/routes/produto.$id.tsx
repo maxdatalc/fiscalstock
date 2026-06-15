@@ -70,10 +70,29 @@ function ProdutoDetalheContent() {
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <StockComparisonCard label="Estoque físico" value={d.estoque_fisico} />
-          <StockComparisonCard label="Estoque fiscal" value={d.estoque_fiscal} tone={d.estoque_fiscal <= 0 ? "danger" : "default"} />
-          <StockComparisonCard label="Diferença físico × fiscal" value={d.diferenca > 0 ? `+${d.diferenca}` : d.diferenca} tone={d.diferenca > 0 ? "warning" : "default"} hint="Físico − Fiscal" />
-          <StockComparisonCard label="Disponível p/ emitir" value={d.disponivel_para_emissao} tone="primary" hint="Considera reservas em O.S" />
+          <StockComparisonCard
+            label="Estoque físico"
+            value={d.estoque_fisico}
+            hint="Quantidade real no ERP (produto_empresa)"
+          />
+          <StockComparisonCard
+            label="Estoque fiscal"
+            value={d.estoque_fiscal}
+            tone={d.estoque_fiscal <= 0 ? "danger" : "default"}
+            hint="Calculado: inventário + entradas − saídas + devoluções"
+          />
+          <StockComparisonCard
+            label="Diferença físico − fiscal"
+            value={d.diferenca > 0 ? `+${d.diferenca}` : d.diferenca}
+            tone={d.diferenca > 0 ? "warning" : "default"}
+            hint={d.diferenca > 0 ? "Físico maior que fiscal — risco de NF sem cobertura" : "Dentro do esperado"}
+          />
+          <StockComparisonCard
+            label="Disponível p/ emitir NF"
+            value={d.disponivel_para_emissao}
+            tone={d.disponivel_para_emissao <= 0 ? "danger" : "primary"}
+            hint="min(físico, fiscal) — o que pode sair com NF"
+          />
         </div>
 
         <div className="grid gap-6 lg:grid-cols-2">

@@ -8,10 +8,10 @@ import { RequireLoja } from "@/components/RequireLoja";
 import { IntegrationStatusBanner } from "@/components/IntegrationStatusBanner";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Package, AlertTriangle, Ban, ClipboardList } from "lucide-react";
+import { Package, ClipboardList, Info } from "lucide-react";
 import { stockService } from "@/lib/services/stock-adapter";
 import { serviceOrderService } from "@/lib/services/service-order-adapter";
-import { calcularStatusFiscal, type Produto } from "@/lib/types";
+import type { Produto } from "@/lib/types";
 import { useAuth } from "@/lib/auth-context";
 
 export const Route = createFileRoute("/dashboard")({
@@ -47,11 +47,9 @@ function DashboardContent() {
       .catch(console.error);
   }, [busca, lojaAtiva?.id]);
 
-  const stats = useMemo(() => {
-    const fiscalMenor = produtos.filter((p) => p.estoqueFiscal < p.estoqueFisico).length;
-    const semFiscal = produtos.filter((p) => p.estoqueFiscal <= 0).length;
-    return { total: produtos.length, fiscalMenor, semFiscal };
-  }, [produtos]);
+  const stats = useMemo(() => ({
+    total: produtos.length,
+  }), [produtos]);
 
   return (
     <div className="space-y-6">
@@ -65,15 +63,19 @@ function DashboardContent() {
       <IntegrationStatusBanner />
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <StockComparisonCard label="Produtos consultados" value={stats.total} icon={<Package className="h-4 w-4" />} />
-          <StockComparisonCard label="Fiscal menor que físico" value={stats.fiscalMenor} tone="warning" icon={<AlertTriangle className="h-4 w-4" />} />
-          <StockComparisonCard label="Sem saldo fiscal" value={stats.semFiscal} tone="danger" icon={<Ban className="h-4 w-4" />} />
-          <StockComparisonCard label="O.S abertas" value={osAbertas} tone="primary" icon={<ClipboardList className="h-4 w-4" />} />
+        <StockComparisonCard label="Produtos na busca" value={stats.total} icon={<Package className="h-4 w-4" />} />
+        <StockComparisonCard label="O.S abertas" value={osAbertas} tone="primary" icon={<ClipboardList className="h-4 w-4" />} />
       </div>
 
       <div className="rounded-lg border bg-card p-5">
-          <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <h2 className="text-base font-semibold">Produtos</h2>
+          <div className="mb-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="text-base font-semibold">Busca de produtos</h2>
+              <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                <Info className="h-3 w-3" />
+                Estoque físico vem do ERP em tempo real. Estoque fiscal é calculado ao abrir o produto.
+              </p>
+            </div>
             <div className="md:w-96">
               <ProductSearch value={busca} onChange={setBusca} />
             </div>
@@ -82,42 +84,33 @@ function DashboardContent() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Código</TableHead>
+                  <TableHead className="w-28">Código</TableHead>
                   <TableHead>Produto</TableHead>
-                  <TableHead className="text-right">Físico</TableHead>
-                  <TableHead className="text-right">Fiscal</TableHead>
-                  <TableHead className="text-right">Diferença</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
+                  <TableHead className="w-16">Un</TableHead>
+                  <TableHead className="w-32 text-right">Estoque físico</TableHead>
+                  <TableHead className="w-32 text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {produtos.map((p) => {
-                  const dif = p.estoqueFisico - p.estoqueFiscal;
-                  const status = calcularStatusFiscal(p);
-                  return (
-                    <TableRow key={p.id}>
-                      <TableCell className="font-mono text-sm">{p.codigo}</TableCell>
-                      <TableCell>
-                        <p className="font-medium">{p.nome}</p>
-                        <p className="text-xs text-muted-foreground">EAN {p.codigoBarras}</p>
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">{p.estoqueFisico}</TableCell>
-                      <TableCell className="text-right tabular-nums">{p.estoqueFiscal}</TableCell>
-                      <TableCell className={`text-right tabular-nums ${dif > 0 ? "text-destructive font-medium" : ""}`}>
-                        {dif > 0 ? `+${dif}` : dif}
-                      </TableCell>
-                      <TableCell><FiscalPhysicalBadge status={status} /></TableCell>
-                      <TableCell className="text-right">
-                        <Button asChild size="sm" variant="outline">
-                          <Link to="/produto/$id" params={{ id: p.id }}>Detalhes</Link>
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
+                {produtos.map((p) => (
+                  <TableRow key={p.id}>
+                    <TableCell className="font-mono text-sm">{p.codigo}</TableCell>
+                    <TableCell className="font-medium">{p.nome}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{p.unidade}</TableCell>
+                    <TableCell className="text-right tabular-nums font-medium">{p.estoqueFisico}</TableCell>
+                    <TableCell className="text-right">
+                      <Button asChild size="sm" variant="outline">
+                        <Link to="/produto/$id" params={{ id: p.id }}>Ver estoque fiscal</Link>
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
                 {produtos.length === 0 && (
-                  <TableRow><TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">Nenhum produto encontrado.</TableCell></TableRow>
+                  <TableRow>
+                    <TableCell colSpan={5} className="py-8 text-center text-sm text-muted-foreground">
+                      {busca ? "Nenhum produto encontrado." : "Digite o nome ou código do produto para buscar."}
+                    </TableCell>
+                  </TableRow>
                 )}
               </TableBody>
             </Table>

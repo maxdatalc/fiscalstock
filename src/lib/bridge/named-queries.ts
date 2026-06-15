@@ -138,7 +138,7 @@ CROSS JOIN Ajustes aj
 const LIST_SERVICE_ORDERS = `
 SELECT
   v.vedId              AS vedId,
-  v.vedCod             AS vedNum,
+  CAST(v.vedId AS NVARCHAR(20)) AS vedNum,
   COALESCE(c.cliNome, v.vedCliNome) AS clienteNome,
   COALESCE(ve.veiPlaca, '')          AS placa,
   v.vedStatus          AS status,
@@ -164,7 +164,7 @@ ORDER BY v.vedAbertura DESC
 const GET_SERVICE_ORDER_DETAIL = `
 SELECT
   v.vedId              AS vedId,
-  v.vedCod             AS vedNum,
+  CAST(v.vedId AS NVARCHAR(20)) AS vedNum,
   v.vedClienteId       AS clienteId,
   COALESCE(c.cliNome, v.vedCliNome) AS clienteNome,
   COALESCE(ve.veiPlaca, '')          AS placa,
