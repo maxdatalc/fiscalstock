@@ -36,7 +36,7 @@ export async function queryBridge<T = Record<string, unknown>>(
   config: BridgeConfig,
   sql: string,
   params: Record<string, unknown> = {},
-  timeoutMs = 10_000,
+  timeoutMs = 30_000,
 ): Promise<T[]> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
@@ -55,7 +55,7 @@ export async function queryBridge<T = Record<string, unknown>>(
   } catch (err) {
     clearTimeout(timer);
     if ((err as Error).name === "AbortError") {
-      throw new Error(`Bridge SQL: timeout após ${timeoutMs}ms`);
+      throw new Error(`Bridge SQL: timeout após ${timeoutMs / 1000}s — query demorou demais`);
     }
     throw new Error(`Bridge SQL: falha de rede — ${(err as Error).message}`);
   } finally {
