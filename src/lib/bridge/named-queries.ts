@@ -138,9 +138,9 @@ CROSS JOIN Ajustes aj
 const LIST_SERVICE_ORDERS = `
 SELECT
   v.vedId              AS vedId,
-  v.vedNum             AS vedNum,
+  v.vedCod             AS vedNum,
   COALESCE(c.cliNome, v.vedCliNome) AS clienteNome,
-  ''                   AS placa,
+  COALESCE(ve.veiPlaca, '')          AS placa,
   v.vedStatus          AS status,
   CONVERT(VARCHAR(23), v.vedAbertura, 126) AS dataAbertura,
   v.vedEquipamento     AS equipamento,
@@ -148,7 +148,8 @@ SELECT
   v.vedDefeito         AS defeito,
   v.vedObs             AS obs
 FROM venda v
-LEFT JOIN cliente c ON c.cliId = v.vedCliId
+LEFT JOIN cliente c  ON c.cliId  = v.vedClienteId
+LEFT JOIN veiculo ve ON ve.veiId = v.vedVeiculoId
 WHERE v.empId   = @empId
   AND v.vedTipo = 'OS'
   AND v.vedStatus NOT IN ('Z')
@@ -163,10 +164,10 @@ ORDER BY v.vedAbertura DESC
 const GET_SERVICE_ORDER_DETAIL = `
 SELECT
   v.vedId              AS vedId,
-  v.vedNum             AS vedNum,
-  v.vedCliId           AS clienteId,
+  v.vedCod             AS vedNum,
+  v.vedClienteId       AS clienteId,
   COALESCE(c.cliNome, v.vedCliNome) AS clienteNome,
-  ''                   AS placa,
+  COALESCE(ve.veiPlaca, '')          AS placa,
   v.vedStatus          AS status,
   CONVERT(VARCHAR(23), v.vedAbertura, 126) AS dataAbertura,
   v.vedEquipamento     AS equipamento,
@@ -175,7 +176,8 @@ SELECT
   v.vedObs             AS obs,
   v.vedLaudoTec        AS laudoTec
 FROM venda v
-LEFT JOIN cliente c ON c.cliId = v.vedCliId
+LEFT JOIN cliente c  ON c.cliId  = v.vedClienteId
+LEFT JOIN veiculo ve ON ve.veiId = v.vedVeiculoId
 WHERE v.vedId = @osId
   AND v.empId  = @empId
   AND v.vedTipo = 'OS'
