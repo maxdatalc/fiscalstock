@@ -4,14 +4,33 @@ import { useServerFn } from "@tanstack/react-start";
 import { AppShell } from "@/components/AppShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { FileText, Plus, RefreshCw, Settings2, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth-context";
@@ -64,7 +83,10 @@ function Config() {
           </TabsList>
 
           <TabsContent value="empresas">
-            <EmpresasLojasTab canEditGlobal={isGlobalAdmin} canEditLoja={canManageActiveCompany || isGlobalAdmin} />
+            <EmpresasLojasTab
+              canEditGlobal={isGlobalAdmin}
+              canEditLoja={canManageActiveCompany || isGlobalAdmin}
+            />
           </TabsContent>
           <TabsContent value="logs">
             <LogsTab />
@@ -77,8 +99,6 @@ function Config() {
     </AppShell>
   );
 }
-
-// ──────────────────────────────────────── Local types
 
 type Empresa = {
   id: string;
@@ -107,9 +127,13 @@ type UserVinculo = {
   email: string;
 };
 
-// ──────────────────────────────────────── EmpresasLojasTab
-
-function EmpresasLojasTab({ canEditGlobal, canEditLoja }: { canEditGlobal: boolean; canEditLoja: boolean }) {
+function EmpresasLojasTab({
+  canEditGlobal,
+  canEditLoja,
+}: {
+  canEditGlobal: boolean;
+  canEditLoja: boolean;
+}) {
   const listEmpresas = useServerFn(listEmpresasAdmin);
   const doCreate = useServerFn(createEmpresa);
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
@@ -179,7 +203,9 @@ function EmpresasLojasTab({ canEditGlobal, canEditLoja }: { canEditGlobal: boole
       </CardHeader>
       <CardContent className="p-0">
         {empresas.length === 0 ? (
-          <p className="p-6 text-center text-sm text-muted-foreground">Nenhuma empresa cadastrada.</p>
+          <p className="p-6 text-center text-sm text-muted-foreground">
+            Nenhuma empresa cadastrada.
+          </p>
         ) : (
           <Accordion type="multiple" value={openItems} onValueChange={setOpenItems}>
             {empresas.map((empresa) => (
@@ -198,8 +224,6 @@ function EmpresasLojasTab({ canEditGlobal, canEditLoja }: { canEditGlobal: boole
     </Card>
   );
 }
-
-// ──────────────────────────────────────── EmpresaAccordionItem
 
 function EmpresaAccordionItem({
   empresa,
@@ -233,7 +257,9 @@ function EmpresaAccordionItem({
     setLoading(true);
     Promise.all([
       listLojas({ data: { empresa_id: empresa.id } }) as Promise<Loja[]>,
-      (listUsers({ data: { empresa_id: empresa.id } }) as Promise<UserVinculo[]>).catch(() => [] as UserVinculo[]),
+      (listUsers({ data: { empresa_id: empresa.id } }) as Promise<UserVinculo[]>).catch(
+        () => [] as UserVinculo[],
+      ),
     ])
       .then(([ls, us]) => {
         setLojas(ls);
@@ -273,10 +299,14 @@ function EmpresaAccordionItem({
         <div className="flex flex-1 items-center gap-3 text-left">
           <div className="flex-1">
             <p className="font-semibold">{empresa.nome_fantasia}</p>
-            {empresa.cnpj && <p className="font-mono text-xs text-muted-foreground">{empresa.cnpj}</p>}
+            {empresa.cnpj && (
+              <p className="font-mono text-xs text-muted-foreground">{empresa.cnpj}</p>
+            )}
           </div>
           {loaded && <span className="text-xs text-muted-foreground">{lojas.length} loja(s)</span>}
-          <Badge variant={empresa.ativo ? "default" : "outline"}>{empresa.ativo ? "Ativa" : "Inativa"}</Badge>
+          <Badge variant={empresa.ativo ? "default" : "outline"}>
+            {empresa.ativo ? "Ativa" : "Inativa"}
+          </Badge>
         </div>
       </AccordionTrigger>
       <AccordionContent className="px-6 pb-6">
@@ -289,10 +319,11 @@ function EmpresaAccordionItem({
         )}
         {!loading && loaded && (
           <div className="space-y-6 pt-2">
-            {/* ── Lojas ── */}
             <div>
               <div className="mb-3 flex items-center justify-between">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Lojas vinculadas</p>
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Lojas vinculadas
+                </p>
                 {canEditGlobal && (
                   <Dialog open={lojaDialogOpen} onOpenChange={setLojaDialogOpen}>
                     <DialogTrigger asChild>
@@ -312,7 +343,11 @@ function EmpresaAccordionItem({
                         <div className="grid grid-cols-2 gap-3">
                           <div>
                             <Label>emp_id_maxdata</Label>
-                            <Input value={empIdL} onChange={(e) => setEmpIdL(e.target.value)} placeholder="ex.: 1" />
+                            <Input
+                              value={empIdL}
+                              onChange={(e) => setEmpIdL(e.target.value)}
+                              placeholder="ex.: 1"
+                            />
                           </div>
                           <div>
                             <Label>terminal_maxdata</Label>
@@ -333,9 +368,10 @@ function EmpresaAccordionItem({
                   </Dialog>
                 )}
               </div>
-
               {lojas.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Nenhuma loja cadastrada para esta empresa.</p>
+                <p className="text-sm text-muted-foreground">
+                  Nenhuma loja cadastrada para esta empresa.
+                </p>
               ) : (
                 <div className="space-y-2">
                   {lojas.map((loja) => (
@@ -345,14 +381,15 @@ function EmpresaAccordionItem({
                       empresaNome={empresa.nome_fantasia}
                       canEdit={canEditLoja}
                       isConfigOpen={configAberta === loja.id}
-                      onToggleConfig={() => setConfigAberta(configAberta === loja.id ? null : loja.id)}
+                      onToggleConfig={() =>
+                        setConfigAberta(configAberta === loja.id ? null : loja.id)
+                      }
                     />
                   ))}
                 </div>
               )}
             </div>
 
-            {/* ── Usuários ── */}
             <div>
               <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Usuários vinculados
@@ -388,8 +425,6 @@ function EmpresaAccordionItem({
     </AccordionItem>
   );
 }
-
-// ──────────────────────────────────────── LojaCard
 
 function LojaCard({
   loja,
@@ -431,15 +466,23 @@ function LojaCard({
             <Badge variant="outline" className="font-mono text-xs">
               {loja.terminal_maxdata}
             </Badge>
-            <Badge variant={loja.ativo ? "default" : "outline"}>{loja.ativo ? "Ativa" : "Inativa"}</Badge>
+            <Badge variant={loja.ativo ? "default" : "outline"}>
+              {loja.ativo ? "Ativa" : "Inativa"}
+            </Badge>
           </div>
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             {status ? (
               <>
-                <Badge variant={status.status_bridge === "online" ? "default" : "outline"} className="text-xs">
+                <Badge
+                  variant={status.status_bridge === "online" ? "default" : "outline"}
+                  className="text-xs"
+                >
                   Bridge {status.status_bridge === "online" ? "✓" : "—"}
                 </Badge>
-                <Badge variant={status.status_maxapi === "online" ? "default" : "outline"} className="text-xs">
+                <Badge
+                  variant={status.status_maxapi === "online" ? "default" : "outline"}
+                  className="text-xs"
+                >
                   MaxAPI {status.status_maxapi === "online" ? "✓" : "—"}
                 </Badge>
               </>
@@ -469,8 +512,6 @@ function LojaCard({
     </div>
   );
 }
-
-// ──────────────────────────────────────── LojaIntegrationPanel
 
 function LojaIntegrationPanel({
   loja_id,
@@ -504,7 +545,10 @@ function LojaIntegrationPanel({
 
   async function reload() {
     try {
-      const [status, cfg] = await Promise.all([fetchStatus({ data: { loja_id } }), fetchConfig({ data: { loja_id } })]);
+      const [status, cfg] = await Promise.all([
+        fetchStatus({ data: { loja_id } }),
+        fetchConfig({ data: { loja_id } }),
+      ]);
       setInfo(status);
       setBridgeUrl(cfg?.bridge_url ?? "");
       setMaxUrl(cfg?.maxapi_url ?? "");
@@ -538,14 +582,8 @@ function LojaIntegrationPanel({
       });
       toast.success("Configuração salva. Testando conexões…");
       const [b, m] = await Promise.all([
-        testBridge({ data: { loja_id } }).catch((e) => ({
-          status: "erro",
-          mensagem: (e as Error).message,
-        })),
-        testMax({ data: { loja_id } }).catch((e) => ({
-          status: "erro",
-          mensagem: (e as Error).message,
-        })),
+        testBridge({ data: { loja_id } }).catch((e) => ({ status: "erro", mensagem: (e as Error).message })),
+        testMax({ data: { loja_id } }).catch((e) => ({ status: "erro", mensagem: (e as Error).message })),
       ]);
       setBridgeResult(b);
       setMaxResult(m);
@@ -586,10 +624,8 @@ function LojaIntegrationPanel({
         Integração — {empresa_nome} / {loja_nome}
       </p>
       <p className="text-xs text-muted-foreground">
-        Tokens nunca aparecem no frontend. Para alterar o token da Bridge, digite um valor novo. Deixe vazio para
-        preservar o atual.
+        Tokens nunca aparecem no frontend. Para alterar o token da Bridge, digite um valor novo. Deixe vazio para preservar o atual.
       </p>
-
       <div className="grid gap-2 md:grid-cols-2">
         <div className="rounded border p-3">
           <p className="text-xs text-muted-foreground">Bridge SQL</p>
@@ -614,15 +650,10 @@ function LojaIntegrationPanel({
           </div>
         </div>
       </div>
-
       <fieldset disabled={!canEdit} className="space-y-3 disabled:opacity-60">
         <div>
           <Label>URL da Bridge SQL</Label>
-          <Input
-            value={bridgeUrl}
-            onChange={(e) => setBridgeUrl(e.target.value)}
-            placeholder="https://bridge.cliente.local"
-          />
+          <Input value={bridgeUrl} onChange={(e) => setBridgeUrl(e.target.value)} placeholder="https://bridge.cliente.local" />
         </div>
         <div>
           <div className="flex items-center justify-between">
@@ -641,11 +672,7 @@ function LojaIntegrationPanel({
         </div>
         <div>
           <Label>URL da MaxAPI</Label>
-          <Input
-            value={maxUrl}
-            onChange={(e) => setMaxUrl(e.target.value)}
-            placeholder="https://maxapi.cliente.local"
-          />
+          <Input value={maxUrl} onChange={(e) => setMaxUrl(e.target.value)} placeholder="https://maxapi.cliente.local" />
         </div>
         <div className="grid gap-3 md:grid-cols-2">
           <div>
@@ -673,18 +700,14 @@ function LojaIntegrationPanel({
             {bridgeResult && (
               <p>
                 <span className="font-semibold">Bridge:</span>{" "}
-                <Badge variant={bridgeResult.status === "online" ? "default" : "outline"} className="mr-1">
-                  {bridgeResult.status}
-                </Badge>
+                <Badge variant={bridgeResult.status === "online" ? "default" : "outline"} className="mr-1">{bridgeResult.status}</Badge>
                 {bridgeResult.mensagem}
               </p>
             )}
             {maxResult && (
               <p>
                 <span className="font-semibold">MaxAPI:</span>{" "}
-                <Badge variant={maxResult.status === "online" ? "default" : "outline"} className="mr-1">
-                  {maxResult.status}
-                </Badge>
+                <Badge variant={maxResult.status === "online" ? "default" : "outline"} className="mr-1">{maxResult.status}</Badge>
                 {maxResult.mensagem}
               </p>
             )}
@@ -695,29 +718,14 @@ function LojaIntegrationPanel({
   );
 }
 
-// ──────────────────────────────────────── LogsTab
-
 function LogsTab() {
   const { empresaAtiva, lojaAtiva } = useAuth();
   const list = useServerFn(listAuditLogs);
-  const [rows, setRows] = useState<
-    Array<{
-      id: string;
-      created_at: string;
-      acao: string;
-      entidade: string | null;
-      loja_id: string | null;
-      user_id: string | null;
-    }>
-  >([]);
+  const [rows, setRows] = useState<Array<{ id: string; created_at: string; acao: string; entidade: string | null; loja_id: string | null; user_id: string | null }>>([]);
 
   async function reload() {
     try {
-      setRows(
-        await list({
-          data: { empresa_id: empresaAtiva?.id, loja_id: lojaAtiva?.id, limit: 200 },
-        }),
-      );
+      setRows(await list({ data: { empresa_id: empresaAtiva?.id, loja_id: lojaAtiva?.id, limit: 200 } }));
     } catch (e) {
       console.error(e);
     }
@@ -731,20 +739,11 @@ function LogsTab() {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-base">Logs de auditoria</CardTitle>
-        <Button variant="outline" size="sm" onClick={reload}>
-          <RefreshCw className="mr-1 h-3.5 w-3.5" /> Atualizar
-        </Button>
+        <Button variant="outline" size="sm" onClick={reload}><RefreshCw className="mr-1 h-3.5 w-3.5" /> Atualizar</Button>
       </CardHeader>
       <CardContent>
         <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Data</TableHead>
-              <TableHead>Ação</TableHead>
-              <TableHead>Entidade</TableHead>
-              <TableHead>Loja</TableHead>
-            </TableRow>
-          </TableHeader>
+          <TableHeader><TableRow><TableHead>Data</TableHead><TableHead>Ação</TableHead><TableHead>Entidade</TableHead><TableHead>Loja</TableHead></TableRow></TableHeader>
           <TableBody>
             {rows.map((l) => (
               <TableRow key={l.id}>
@@ -755,11 +754,7 @@ function LogsTab() {
               </TableRow>
             ))}
             {rows.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={4} className="py-6 text-center text-sm text-muted-foreground">
-                  Nenhum log.
-                </TableCell>
-              </TableRow>
+              <TableRow><TableCell colSpan={4} className="py-6 text-center text-sm text-muted-foreground">Nenhum log.</TableCell></TableRow>
             )}
           </TableBody>
         </Table>
@@ -767,8 +762,6 @@ function LogsTab() {
     </Card>
   );
 }
-
-// ──────────────────────────────────────── ContratoTab
 
 function ContratoTab() {
   return (
@@ -781,8 +774,7 @@ function ContratoTab() {
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
         <p>
-          Esta aba documenta o contrato entre o frontend (Lovable) e a camada de integração real (Claude Code). O
-          documento completo vive em{" "}
+          Esta aba documenta o contrato entre o frontend (Lovable) e a camada de integração real (Claude Code). O documento completo vive em{" "}
           <code className="rounded bg-muted px-1.5 py-0.5 text-xs">docs/lovable-claude-handoff.md</code>.
         </p>
         <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
