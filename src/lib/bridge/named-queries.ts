@@ -1,5 +1,5 @@
-/**
- * Named query registry — server-side only.
+﻿/**
+ * Named query registry â€” server-side only.
  *
  * SQL is hardcoded here; the frontend only ever sends a `queryName` string
  * plus typed params. This prevents SQL injection and free-query attacks.
@@ -7,11 +7,11 @@
  * All SQL targets the BATAUTO (MaxData) SQL Server via the Bridge proxy.
  * Parameters use SQL Server @name syntax.
  *
- * Schema validated against BATAUTO on 2026-06-14 — see docs/maxdata-fiscal-stock-research.md.
+ * Schema validated against BATAUTO on 2026-06-14 â€” see docs/maxdata-fiscal-stock-research.md.
  */
 
 // ---------------------------------------------------------------------------
-// Query 1 — SEARCH_PRODUCTS
+// Query 1 â€” SEARCH_PRODUCTS
 // proEstoqueAtual comes from produto_empresa (per-loja stock, not global total)
 // ---------------------------------------------------------------------------
 const SEARCH_PRODUCTS = `
@@ -33,7 +33,7 @@ ORDER BY p.proDescricao
 `;
 
 // ---------------------------------------------------------------------------
-// Query 2 — GET_PRODUCT_PHYSICAL_STOCK
+// Query 2 â€” GET_PRODUCT_PHYSICAL_STOCK
 // proEstoqueAtual comes from produto_empresa (per-loja stock, not global total)
 // ---------------------------------------------------------------------------
 const GET_PRODUCT_PHYSICAL_STOCK = `
@@ -49,9 +49,9 @@ WHERE p.proId = @proId
 `;
 
 // ---------------------------------------------------------------------------
-// Query 3 — GET_FISCAL_STOCK_COMPOSITION
-// Calculates fiscal stock using the validated formula (research doc §8).
-// Formula: InventarioBase + Entradas(E) + Devoluções(1202/2202) - Saídas(S) + Ajustes
+// Query 3 â€” GET_FISCAL_STOCK_COMPOSITION
+// Calculates fiscal stock using the validated formula (research doc Â§8).
+// Formula: InventarioBase + Entradas(E) + DevoluÃ§Ãµes(1202/2202) - SaÃ­das(S) + Ajustes
 // ---------------------------------------------------------------------------
 const GET_FISCAL_STOCK_COMPOSITION = `
 WITH InventarioBase AS (
@@ -131,7 +131,7 @@ CROSS JOIN Ajustes aj
 `;
 
 // ---------------------------------------------------------------------------
-// Query 4 — LIST_SERVICE_ORDERS
+// Query 4 â€” LIST_SERVICE_ORDERS
 // All OS for loja (excludes only deleted 'Z'); optional filters via empty-string
 // guards so all params are always passed (SQL Server requires declared params).
 // ---------------------------------------------------------------------------
@@ -142,7 +142,7 @@ SELECT
   COALESCE(c.cliNome, v.vedNomeDest) AS clienteNome,
   v.vedPlaca           AS placa,
   v.vedStatus          AS status,
-  CONVERT(VARCHAR(23), v.vedAbertura, 126) AS dataAbertura,
+  CONVERT(VARCHAR(23), v.vedDataEmissao, 126) AS dataAbertura,
   v.vedObs             AS obs,
   v.vedDefeitoRecl     AS defeito
 FROM venda v
@@ -153,11 +153,11 @@ WHERE v.empId   = @empId
   AND (@statusFilter = '' OR v.vedStatus = @statusFilter)
   AND (@clienteNome  = '' OR COALESCE(c.cliNome, v.vedNomeDest) LIKE @clienteNome)
   AND (@placa        = '' OR v.vedPlaca = @placa)
-ORDER BY v.vedAbertura DESC
+ORDER BY v.vedDataEmissao DESC
 `;
 
 // ---------------------------------------------------------------------------
-// Query 5 — GET_SERVICE_ORDER_DETAIL
+// Query 5 â€” GET_SERVICE_ORDER_DETAIL
 // ---------------------------------------------------------------------------
 const GET_SERVICE_ORDER_DETAIL = `
 SELECT
@@ -167,7 +167,7 @@ SELECT
   COALESCE(c.cliNome, v.vedNomeDest) AS clienteNome,
   v.vedPlaca           AS placa,
   v.vedStatus          AS status,
-  CONVERT(VARCHAR(23), v.vedAbertura, 126) AS dataAbertura,
+  CONVERT(VARCHAR(23), v.vedDataEmissao, 126) AS dataAbertura,
   v.vedObs             AS obs,
   v.vedDefeitoRecl     AS defeito,
   v.vedLaudoTec        AS laudoTec
@@ -179,7 +179,7 @@ WHERE v.vedId = @osId
 `;
 
 // ---------------------------------------------------------------------------
-// Query 6 — GET_SERVICE_ORDER_ITEMS
+// Query 6 â€” GET_SERVICE_ORDER_ITEMS
 // ---------------------------------------------------------------------------
 const GET_SERVICE_ORDER_ITEMS = `
 SELECT
@@ -200,7 +200,7 @@ ORDER BY vdi.vdiId
 `;
 
 // ---------------------------------------------------------------------------
-// Registry — maps queryName → { sql, allowedParams }
+// Registry â€” maps queryName â†’ { sql, allowedParams }
 // Only keys listed here are callable from server functions.
 // ---------------------------------------------------------------------------
 
