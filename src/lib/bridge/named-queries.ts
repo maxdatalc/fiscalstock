@@ -144,7 +144,7 @@ SELECT
   v.vedStatus          AS status,
   CONVERT(VARCHAR(23), v.vedDataEmissao, 126) AS dataAbertura,
   v.vedObs             AS obs,
-  v.vedDefeitoRecl     AS defeito
+  ''                   AS defeito
 FROM venda v
 LEFT JOIN cliente c ON c.cliId = v.vedCliId
 WHERE v.empId   = @empId
@@ -169,7 +169,7 @@ SELECT
   v.vedStatus          AS status,
   CONVERT(VARCHAR(23), v.vedDataEmissao, 126) AS dataAbertura,
   v.vedObs             AS obs,
-  v.vedDefeitoRecl     AS defeito,
+  ''                   AS defeito,
   v.vedLaudoTec        AS laudoTec
 FROM venda v
 LEFT JOIN cliente c ON c.cliId = v.vedCliId
