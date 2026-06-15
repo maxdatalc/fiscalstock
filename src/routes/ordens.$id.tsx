@@ -81,10 +81,24 @@ function OSDetailContent() {
 
   if (loading) {
     return (
-      <div className="space-y-3">
-        <div className="h-6 w-48 animate-pulse rounded bg-muted" />
-        <div className="h-4 w-72 animate-pulse rounded bg-muted" />
-        <div className="h-40 w-full animate-pulse rounded bg-muted" />
+      <div className="space-y-4">
+        <div className="rounded-lg border bg-card px-4 py-3 shadow-sm">
+          <div className="mb-2 flex items-center gap-2">
+            <div className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            <span className="text-sm font-medium">Consultando O.S...</span>
+          </div>
+          <div className="relative h-1.5 overflow-hidden rounded-full bg-muted">
+            <div
+              className="absolute h-full w-1/3 rounded-full bg-primary"
+              style={{ animation: "consulta-slide 1.4s ease-in-out infinite" }}
+            />
+          </div>
+        </div>
+        <div className="space-y-3">
+          <div className="h-8 w-64 animate-pulse rounded bg-muted" />
+          <div className="h-4 w-96 animate-pulse rounded bg-muted" />
+          <div className="h-40 w-full animate-pulse rounded bg-muted" />
+        </div>
       </div>
     );
   }

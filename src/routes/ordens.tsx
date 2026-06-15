@@ -89,10 +89,24 @@ function OrdensIndex() {
           </div>
 
           {loading ? (
-            <div className="space-y-2">
-              {Array.from({ length: 8 }).map((_, i) => (
-                <div key={i} className="h-12 animate-pulse rounded-md bg-muted" />
-              ))}
+            <div className="space-y-4">
+              <div className="rounded-lg border bg-card px-4 py-3 shadow-sm">
+                <div className="mb-2 flex items-center gap-2">
+                  <div className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                  <span className="text-sm font-medium">Consultando banco de dados...</span>
+                </div>
+                <div className="relative h-1.5 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="absolute h-full w-1/3 rounded-full bg-primary"
+                    style={{ animation: "consulta-slide 1.4s ease-in-out infinite" }}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                {Array.from({ length: 7 }).map((_, i) => (
+                  <div key={i} className="h-12 animate-pulse rounded-md bg-muted" />
+                ))}
+              </div>
             </div>
           ) : (
             <>
