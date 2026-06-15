@@ -28,6 +28,19 @@ export const Route = createFileRoute("/ordens/$id")({
   component: OSDetail,
 });
 
+const statusLabel: Record<OrdemServico["status"], { label: string; cls: string }> = {
+  aberta: { label: "Aberta", cls: "bg-primary/10 text-primary border-primary/20" },
+  em_andamento: {
+    label: "Em andamento",
+    cls: "bg-[color:var(--warning)]/15 text-[color:oklch(0.5_0.15_70)] border-[color:var(--warning)]/30",
+  },
+  faturada: {
+    label: "Faturada",
+    cls: "bg-[color:var(--success)]/15 text-[color:var(--success)] border-[color:var(--success)]/30",
+  },
+  cancelada: { label: "Cancelada", cls: "bg-muted text-muted-foreground border-border" },
+};
+
 function OSDetail() {
   return (
     <AppShell>
@@ -54,17 +67,17 @@ function OSDetailContent() {
     | null
   >(null);
 
-  // TODO CLAUDE: substituir por chamada real à MaxAPI (GET O.S. por id).
   useEffect(() => {
+    if (!lojaAtiva) return;
     setLoading(true);
     serviceOrderService
-      .get(id)
+      .get(id, lojaAtiva.id)
       .then((r) => {
         setOs(r);
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, [id, reload]);
+  }, [id, lojaAtiva?.id, reload]);
 
   if (loading) {
     return (
@@ -86,7 +99,7 @@ function OSDetailContent() {
           <CardContent className="py-10 text-center">
             <p className="text-sm font-medium">Ordem de serviço não encontrada</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              A consulta detalhada por ID ainda não está disponível — aguardando integração definitiva com a MaxAPI.
+              O.S #{id} não existe nesta loja ou foi excluída.
             </p>
           </CardContent>
         </Card>
@@ -124,81 +137,169 @@ function OSDetailContent() {
     }
   };
 
+  const s = statusLabel[os.status] ?? statusLabel.aberta;
+  const totalItens = os.itens.reduce((acc, it) => acc + (it.total ?? 0), 0);
+
   return (
-      <div className="space-y-6">
-        <Button variant="ghost" size="sm" onClick={() => router.history.back()} className="-ml-3">
-          <ChevronLeft className="mr-1 h-4 w-4" /> Voltar
-        </Button>
+    <div className="space-y-6">
+      <Button variant="ghost" size="sm" onClick={() => router.history.back()} className="-ml-3">
+        <ChevronLeft className="mr-1 h-4 w-4" /> Voltar
+      </Button>
 
-        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold">{os.numero}</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Cliente <span className="font-medium text-foreground">{os.cliente}</span> • Placa <span className="font-mono">{os.placa}</span> • {new Date(os.data).toLocaleDateString("pt-BR")}
-            </p>
-            <Badge variant="outline" className="mt-2">{os.status}</Badge>
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-semibold">O.S {os.numero}</h1>
+            <Badge variant="outline" className={s.cls}>
+              {s.label}
+            </Badge>
           </div>
-          <Button onClick={() => setOpen(true)}><Plus className="mr-1 h-4 w-4" /> Adicionar item</Button>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Cliente <span className="font-medium text-foreground">{os.cliente}</span>
+            {os.placa && (
+              <>
+                {" "}• Placa <span className="font-mono text-foreground">{os.placa}</span>
+              </>
+            )}
+            {" "}• {new Date(os.data).toLocaleDateString("pt-BR")}
+          </p>
         </div>
+        <Button onClick={() => setOpen(true)}>
+          <Plus className="mr-1 h-4 w-4" /> Adicionar item
+        </Button>
+      </div>
 
+      {(os.defeito || os.obs || os.laudoTec) && (
         <Card>
-          <CardHeader><CardTitle className="text-base">Itens da O.S</CardTitle></CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Código</TableHead>
-                  <TableHead>Produto</TableHead>
-                  <TableHead className="text-right">Quantidade</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {os.itens.map((it) => (
-                  <TableRow key={it.id}>
-                    <TableCell className="font-mono text-sm">{it.codigo}</TableCell>
-                    <TableCell>{it.produtoNome}</TableCell>
-                    <TableCell className="text-right tabular-nums">{it.quantidade}</TableCell>
-                  </TableRow>
-                ))}
-                {os.itens.length === 0 && (
-                  <TableRow><TableCell colSpan={3} className="py-6 text-center text-sm text-muted-foreground">Nenhum item adicionado.</TableCell></TableRow>
-                )}
-              </TableBody>
-            </Table>
+          <CardContent className="grid gap-4 pt-4 sm:grid-cols-3">
+            {os.defeito && (
+              <div>
+                <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Defeito reclamado
+                </p>
+                <p className="text-sm">{os.defeito}</p>
+              </div>
+            )}
+            {os.obs && (
+              <div>
+                <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Observações
+                </p>
+                <p className="text-sm">{os.obs}</p>
+              </div>
+            )}
+            {os.laudoTec && (
+              <div>
+                <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Laudo técnico
+                </p>
+                <p className="text-sm">{os.laudoTec}</p>
+              </div>
+            )}
           </CardContent>
         </Card>
+      )}
 
-        <ServiceOrderItemEditor
-          open={open}
-          onOpenChange={setOpen}
-          empresaId={os.empresaId}
-          onAdd={(item) => submitAdd(item, false)}
-        />
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-base">Itens da O.S</CardTitle>
+          {os.itens.length > 0 && (
+            <span className="text-sm text-muted-foreground">
+              {os.itens.length} {os.itens.length === 1 ? "item" : "itens"}
+              {totalItens > 0 && (
+                <>
+                  {" "}•{" "}
+                  <span className="font-medium text-foreground">
+                    {totalItens.toLocaleString("pt-BR", {
+                      style: "currency",
+                      currency: "BRL",
+                    })}
+                  </span>
+                </>
+              )}
+            </span>
+          )}
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-28">Código</TableHead>
+                <TableHead>Produto</TableHead>
+                <TableHead className="w-16 text-right">Un</TableHead>
+                <TableHead className="w-24 text-right">Qtde</TableHead>
+                <TableHead className="w-32 text-right">Preço unit.</TableHead>
+                <TableHead className="w-32 text-right">Total</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {os.itens.map((it) => (
+                <TableRow key={it.id}>
+                  <TableCell className="font-mono text-sm">{it.codigo}</TableCell>
+                  <TableCell>{it.produtoNome}</TableCell>
+                  <TableCell className="text-right text-sm text-muted-foreground">
+                    {it.unidade ?? "—"}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">{it.quantidade}</TableCell>
+                  <TableCell className="text-right tabular-nums text-sm">
+                    {it.precoUnitario != null
+                      ? it.precoUnitario.toLocaleString("pt-BR", {
+                          style: "currency",
+                          currency: "BRL",
+                        })
+                      : "—"}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums text-sm font-medium">
+                    {it.total != null
+                      ? it.total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
+                      : "—"}
+                  </TableCell>
+                </TableRow>
+              ))}
+              {os.itens.length === 0 && (
+                <TableRow>
+                  <TableCell
+                    colSpan={6}
+                    className="py-6 text-center text-sm text-muted-foreground"
+                  >
+                    Nenhum item adicionado.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
-        <AlertDialog
-          open={!!confirmacao}
-          onOpenChange={(o) => !o && setConfirmacao(null)}
-        >
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle className="flex items-center gap-2 text-destructive">
-                <AlertTriangle className="h-5 w-5" /> Confirmar inclusão com risco fiscal
-              </AlertDialogTitle>
-              <AlertDialogDescription>
-                {confirmacao?.alerta} Deseja prosseguir mesmo assim? Esta ação será registrada no log de auditoria.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={() => confirmacao && submitAdd(confirmacao.item, true)}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              >
-                Prosseguir mesmo assim
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </div>
+      <ServiceOrderItemEditor
+        open={open}
+        onOpenChange={setOpen}
+        empresaId={lojaAtiva?.id}
+        onAdd={(item) => submitAdd(item, false)}
+      />
+
+      <AlertDialog open={!!confirmacao} onOpenChange={(o) => !o && setConfirmacao(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" /> Confirmar inclusão com risco fiscal
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmacao?.alerta} Deseja prosseguir mesmo assim? Esta ação será registrada no log
+              de auditoria.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => confirmacao && submitAdd(confirmacao.item, true)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Prosseguir mesmo assim
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
   );
 }

@@ -6,7 +6,6 @@ import { FiscalPhysicalBadge } from "@/components/FiscalPhysicalBadge";
 import { RequireLoja } from "@/components/RequireLoja";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { AlertTriangle, ChevronLeft, Plus } from "lucide-react";
 import { stockService } from "@/lib/services/stock-adapter";
 import type { ProductStockDetail } from "@/lib/api/stock.functions";
@@ -80,18 +79,9 @@ function ProdutoDetalheContent() {
         <div className="grid gap-6 lg:grid-cols-2">
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base">Composição do estoque fiscal</CardTitle>
-                <Badge variant="outline" className="border-[color:var(--warning)]/40 text-[color:oklch(0.45_0.15_70)]">
-                  Simulado • aguardando mapeamento SQL
-                </Badge>
-              </div>
+              <CardTitle className="text-base">Composição do estoque fiscal</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="mb-3 text-xs text-muted-foreground">
-                ⚠️ Os valores abaixo são <strong>simulados</strong>. A fórmula fiscal definitiva
-                será validada pelo Claude Code junto ao MaxManager.
-              </p>
               {c ? (
                 <dl className="divide-y text-sm">
                   <Row label="Inventário fiscal base" v={c.inventario_base} />

@@ -38,6 +38,9 @@ export type OrdemServico = {
   status: "aberta" | "em_andamento" | "faturada" | "cancelada";
   empresaId: string;
   itens: ItemOS[];
+  obs?: string;
+  defeito?: string;
+  laudoTec?: string;
 };
 
 export type ItemOS = {
@@ -46,6 +49,9 @@ export type ItemOS = {
   produtoNome: string;
   codigo: string;
   quantidade: number;
+  unidade?: string;
+  precoUnitario?: number;
+  total?: number;
   observacao?: string;
 };
 

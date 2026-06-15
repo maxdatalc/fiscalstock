@@ -1,13 +1,18 @@
 import { mockOrdens } from "./mock-data";
 import type { OrdemServico } from "../types";
-import { listServiceOrders, addItemToServiceOrder } from "@/lib/api/service-orders.functions";
+import {
+  listServiceOrders,
+  addItemToServiceOrder,
+  getServiceOrderDetail,
+  getServiceOrderItems,
+} from "@/lib/api/service-orders.functions";
 
 export interface IServiceOrderService {
   list(
     loja_id: string | undefined,
     filters?: { cliente?: string; placa?: string; status?: string },
   ): Promise<OrdemServico[]>;
-  get(id: string): Promise<OrdemServico | null>;
+  get(id: string, loja_id?: string): Promise<OrdemServico | null>;
   addItem(input: {
     loja_id?: string;
     os_id: string;
@@ -18,7 +23,7 @@ export interface IServiceOrderService {
   }): Promise<{ ok: boolean; excedeu_fiscal: boolean; alerta: string | null }>;
 }
 
-function mapMaxApiStatus(s: string): OrdemServico["status"] {
+function mapStatus(s: string): OrdemServico["status"] {
   if (s === "finalizada" || s === "faturada") return "faturada";
   if (s === "cancelada") return "cancelada";
   return "aberta";
@@ -33,7 +38,7 @@ export class MockServiceOrderService implements IServiceOrderService {
         (f?.status && f.status !== "todas" ? o.status === f.status : true),
     );
   }
-  async get(id: string) {
+  async get(id: string, _loja_id?: string) {
     return mockOrdens.find((o) => o.id === id) ?? null;
   }
   async addItem(input: {
@@ -71,6 +76,8 @@ export class ServerServiceOrderService implements IServiceOrderService {
       placa: string;
       status: string;
       dataAbertura: string | null;
+      obs: string;
+      defeito: string;
     }>;
     return rows.map(
       (o): OrdemServico => ({
@@ -79,15 +86,68 @@ export class ServerServiceOrderService implements IServiceOrderService {
         cliente: o.cliente,
         placa: o.placa,
         data: o.dataAbertura ?? new Date().toISOString(),
-        status: mapMaxApiStatus(o.status),
+        status: mapStatus(o.status),
         empresaId: "",
         itens: [],
+        obs: o.obs,
+        defeito: o.defeito,
       }),
     );
   }
 
-  async get(_id: string): Promise<OrdemServico | null> {
-    return null;
+  async get(id: string, loja_id?: string): Promise<OrdemServico | null> {
+    if (!loja_id) return null;
+    try {
+      const [detail, itemRows] = await Promise.all([
+        getServiceOrderDetail({ data: { loja_id, os_id: id } }),
+        getServiceOrderItems({ data: { loja_id, os_id: id } }),
+      ]);
+      const d = detail as unknown as {
+        id: string;
+        numero: string;
+        cliente: string;
+        placa: string;
+        status: string;
+        dataAbertura: string | null;
+        obs: string;
+        defeito: string;
+        laudoTec: string;
+      };
+      const items = itemRows as unknown as Array<{
+        id: string;
+        produtoId: string;
+        codigo: string;
+        produtoNome: string;
+        unidade: string;
+        quantidade: number;
+        precoUnitario: number;
+        total: number;
+      }>;
+      return {
+        id: d.id,
+        numero: d.numero,
+        cliente: d.cliente,
+        placa: d.placa,
+        data: d.dataAbertura ?? new Date().toISOString(),
+        status: mapStatus(d.status),
+        empresaId: loja_id,
+        itens: items.map((r) => ({
+          id: r.id,
+          produtoId: r.produtoId,
+          produtoNome: r.produtoNome,
+          codigo: r.codigo,
+          unidade: r.unidade,
+          quantidade: r.quantidade,
+          precoUnitario: r.precoUnitario,
+          total: r.total,
+        })),
+        obs: d.obs,
+        defeito: d.defeito,
+        laudoTec: d.laudoTec,
+      };
+    } catch {
+      return null;
+    }
   }
 
   async addItem(input: {
