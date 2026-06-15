@@ -73,25 +73,39 @@ export async function queryBridge<T = Record<string, unknown>>(
 }
 
 /**
- * Health check — returns false (not throws) if bridge is unreachable.
+ * Health check via SELECT 1 — more reliable than /health since /query is
+ * the only guaranteed endpoint on the LCGestor Bridge proxy.
+ * Never throws; returns { ok: false, error } on any failure.
  */
 export async function pingBridge(
   config: BridgeConfig,
-): Promise<{ ok: boolean; db: string; ms: number }> {
+): Promise<{ ok: boolean; db: string; ms: number; error?: string }> {
   const t0 = Date.now();
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 5_000);
+  const timer = setTimeout(() => ctrl.abort(), 8_000);
   try {
-    const res = await fetch(`${config.url}/health`, {
-      headers: { Authorization: `Bearer ${config.token}` },
+    const res = await fetch(`${config.url}/query`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${config.token}`,
+      },
+      body: JSON.stringify({ sql: "SELECT 1 AS ping", params: {} }),
       signal: ctrl.signal,
     });
     clearTimeout(timer);
-    if (!res.ok) return { ok: false, db: "", ms: Date.now() - t0 };
-    const json = (await res.json()) as { ok?: boolean; db?: string };
-    return { ok: json.ok ?? true, db: json.db ?? "", ms: Date.now() - t0 };
-  } catch {
+    const ms = Date.now() - t0;
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      return { ok: false, db: "", ms, error: `HTTP ${res.status}: ${text.slice(0, 200)}` };
+    }
+    const json = (await res.json()) as { rows?: unknown[]; error?: string; db?: string };
+    if (json.error) return { ok: false, db: "", ms, error: json.error };
+    return { ok: true, db: json.db ?? "BATAUTO", ms };
+  } catch (err) {
     clearTimeout(timer);
-    return { ok: false, db: "", ms: Date.now() - t0 };
+    const ms = Date.now() - t0;
+    const msg = (err as Error).name === "AbortError" ? "timeout após 8s" : (err as Error).message;
+    return { ok: false, db: "", ms, error: msg };
   }
 }

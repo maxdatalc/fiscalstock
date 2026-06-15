@@ -118,7 +118,7 @@ export const testBridgeConnection = createServerFn({ method: "POST" })
         latencia_ms = result.ms;
       } else {
         status = "erro";
-        mensagem = "Bridge SQL não respondeu ou retornou erro.";
+        mensagem = `Bridge SQL erro: ${result.error ?? "sem resposta"}`;
       }
     } else if (cfg?.bridge_url && !cfg?.bridge_token) {
       status = "nao_configurado";
@@ -245,7 +245,8 @@ export const getIntegrationConfig = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { data: canManage } = await context.supabase.rpc("user_can_manage_loja", {
-      _user_id: context.userId, _loja_id: data.loja_id,
+      _user_id: context.userId,
+      _loja_id: data.loja_id,
     });
     if (!canManage) throw new Error("Apenas owner/admin pode ver configurações de integração.");
 
@@ -266,7 +267,7 @@ export const getIntegrationConfig = createServerFn({ method: "POST" })
 
     return {
       bridge_url: cfg?.bridge_url ?? null,
-      bridge_token_configurado: !!(cfg?.bridge_token),
+      bridge_token_configurado: !!cfg?.bridge_token,
       maxapi_url: cfg?.maxapi_url ?? null,
       emp_id_maxdata: loja?.emp_id_maxdata ?? null,
       terminal_maxdata: loja?.terminal_maxdata ?? null,
@@ -294,7 +295,8 @@ export const saveIntegrationConfig = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { data: canManage } = await context.supabase.rpc("user_can_manage_loja", {
-      _user_id: context.userId, _loja_id: data.loja_id,
+      _user_id: context.userId,
+      _loja_id: data.loja_id,
     });
     if (!canManage) throw new Error("Apenas owner/admin pode alterar configurações de integração.");
 
@@ -319,9 +321,7 @@ export const saveIntegrationConfig = createServerFn({ method: "POST" })
       cfgUpsert.maxapi_token_expires_at = null;
     }
 
-    await supabaseAdmin
-      .from("integration_configs")
-      .upsert(cfgUpsert, { onConflict: "loja_id" });
+    await supabaseAdmin.from("integration_configs").upsert(cfgUpsert, { onConflict: "loja_id" });
 
     if (data.emp_id_maxdata !== undefined || data.terminal_maxdata !== undefined) {
       const lojaUpdate: LojaUpdate = {};
