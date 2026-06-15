@@ -4,33 +4,14 @@ import { useServerFn } from "@tanstack/react-start";
 import { AppShell } from "@/components/AppShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { FileText, Plus, RefreshCw, Settings2, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth-context";
@@ -83,10 +64,7 @@ function Config() {
           </TabsList>
 
           <TabsContent value="empresas">
-            <EmpresasLojasTab
-              canEditGlobal={isGlobalAdmin}
-              canEditLoja={canManageActiveCompany || isGlobalAdmin}
-            />
+            <EmpresasLojasTab canEditGlobal={isGlobalAdmin} canEditLoja={canManageActiveCompany || isGlobalAdmin} />
           </TabsContent>
           <TabsContent value="logs">
             <LogsTab />
@@ -131,13 +109,7 @@ type UserVinculo = {
 
 // ──────────────────────────────────────── EmpresasLojasTab
 
-function EmpresasLojasTab({
-  canEditGlobal,
-  canEditLoja,
-}: {
-  canEditGlobal: boolean;
-  canEditLoja: boolean;
-}) {
+function EmpresasLojasTab({ canEditGlobal, canEditLoja }: { canEditGlobal: boolean; canEditLoja: boolean }) {
   const listEmpresas = useServerFn(listEmpresasAdmin);
   const doCreate = useServerFn(createEmpresa);
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
@@ -207,9 +179,7 @@ function EmpresasLojasTab({
       </CardHeader>
       <CardContent className="p-0">
         {empresas.length === 0 ? (
-          <p className="p-6 text-center text-sm text-muted-foreground">
-            Nenhuma empresa cadastrada.
-          </p>
+          <p className="p-6 text-center text-sm text-muted-foreground">Nenhuma empresa cadastrada.</p>
         ) : (
           <Accordion type="multiple" value={openItems} onValueChange={setOpenItems}>
             {empresas.map((empresa) => (
@@ -263,9 +233,7 @@ function EmpresaAccordionItem({
     setLoading(true);
     Promise.all([
       listLojas({ data: { empresa_id: empresa.id } }) as Promise<Loja[]>,
-      (listUsers({ data: { empresa_id: empresa.id } }) as Promise<UserVinculo[]>).catch(
-        () => [] as UserVinculo[],
-      ),
+      (listUsers({ data: { empresa_id: empresa.id } }) as Promise<UserVinculo[]>).catch(() => [] as UserVinculo[]),
     ])
       .then(([ls, us]) => {
         setLojas(ls);
@@ -305,14 +273,10 @@ function EmpresaAccordionItem({
         <div className="flex flex-1 items-center gap-3 text-left">
           <div className="flex-1">
             <p className="font-semibold">{empresa.nome_fantasia}</p>
-            {empresa.cnpj && (
-              <p className="font-mono text-xs text-muted-foreground">{empresa.cnpj}</p>
-            )}
+            {empresa.cnpj && <p className="font-mono text-xs text-muted-foreground">{empresa.cnpj}</p>}
           </div>
           {loaded && <span className="text-xs text-muted-foreground">{lojas.length} loja(s)</span>}
-          <Badge variant={empresa.ativo ? "default" : "outline"}>
-            {empresa.ativo ? "Ativa" : "Inativa"}
-          </Badge>
+          <Badge variant={empresa.ativo ? "default" : "outline"}>{empresa.ativo ? "Ativa" : "Inativa"}</Badge>
         </div>
       </AccordionTrigger>
       <AccordionContent className="px-6 pb-6">
@@ -328,9 +292,7 @@ function EmpresaAccordionItem({
             {/* ── Lojas ── */}
             <div>
               <div className="mb-3 flex items-center justify-between">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Lojas vinculadas
-                </p>
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Lojas vinculadas</p>
                 {canEditGlobal && (
                   <Dialog open={lojaDialogOpen} onOpenChange={setLojaDialogOpen}>
                     <DialogTrigger asChild>
@@ -350,11 +312,7 @@ function EmpresaAccordionItem({
                         <div className="grid grid-cols-2 gap-3">
                           <div>
                             <Label>emp_id_maxdata</Label>
-                            <Input
-                              value={empIdL}
-                              onChange={(e) => setEmpIdL(e.target.value)}
-                              placeholder="ex.: 1"
-                            />
+                            <Input value={empIdL} onChange={(e) => setEmpIdL(e.target.value)} placeholder="ex.: 1" />
                           </div>
                           <div>
                             <Label>terminal_maxdata</Label>
@@ -377,9 +335,7 @@ function EmpresaAccordionItem({
               </div>
 
               {lojas.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  Nenhuma loja cadastrada para esta empresa.
-                </p>
+                <p className="text-sm text-muted-foreground">Nenhuma loja cadastrada para esta empresa.</p>
               ) : (
                 <div className="space-y-2">
                   {lojas.map((loja) => (
@@ -389,9 +345,7 @@ function EmpresaAccordionItem({
                       empresaNome={empresa.nome_fantasia}
                       canEdit={canEditLoja}
                       isConfigOpen={configAberta === loja.id}
-                      onToggleConfig={() =>
-                        setConfigAberta(configAberta === loja.id ? null : loja.id)
-                      }
+                      onToggleConfig={() => setConfigAberta(configAberta === loja.id ? null : loja.id)}
                     />
                   ))}
                 </div>
@@ -477,23 +431,15 @@ function LojaCard({
             <Badge variant="outline" className="font-mono text-xs">
               {loja.terminal_maxdata}
             </Badge>
-            <Badge variant={loja.ativo ? "default" : "outline"}>
-              {loja.ativo ? "Ativa" : "Inativa"}
-            </Badge>
+            <Badge variant={loja.ativo ? "default" : "outline"}>{loja.ativo ? "Ativa" : "Inativa"}</Badge>
           </div>
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             {status ? (
               <>
-                <Badge
-                  variant={status.status_bridge === "online" ? "default" : "outline"}
-                  className="text-xs"
-                >
+                <Badge variant={status.status_bridge === "online" ? "default" : "outline"} className="text-xs">
                   Bridge {status.status_bridge === "online" ? "✓" : "—"}
                 </Badge>
-                <Badge
-                  variant={status.status_maxapi === "online" ? "default" : "outline"}
-                  className="text-xs"
-                >
+                <Badge variant={status.status_maxapi === "online" ? "default" : "outline"} className="text-xs">
                   MaxAPI {status.status_maxapi === "online" ? "✓" : "—"}
                 </Badge>
               </>
@@ -553,17 +499,12 @@ function LojaIntegrationPanel({
   const [terminal, setTerminal] = useState("");
   const [info, setInfo] = useState<IntegrationStatusInfo | null>(null);
   const [saving, setSaving] = useState(false);
-  const [bridgeResult, setBridgeResult] = useState<{ status: string; mensagem: string } | null>(
-    null,
-  );
+  const [bridgeResult, setBridgeResult] = useState<{ status: string; mensagem: string } | null>(null);
   const [maxResult, setMaxResult] = useState<{ status: string; mensagem: string } | null>(null);
 
   async function reload() {
     try {
-      const [status, cfg] = await Promise.all([
-        fetchStatus({ data: { loja_id } }),
-        fetchConfig({ data: { loja_id } }),
-      ]);
+      const [status, cfg] = await Promise.all([fetchStatus({ data: { loja_id } }), fetchConfig({ data: { loja_id } })]);
       setInfo(status);
       setBridgeUrl(cfg?.bridge_url ?? "");
       setMaxUrl(cfg?.maxapi_url ?? "");
@@ -645,8 +586,8 @@ function LojaIntegrationPanel({
         Integração — {empresa_nome} / {loja_nome}
       </p>
       <p className="text-xs text-muted-foreground">
-        Tokens nunca aparecem no frontend. Para alterar o token da Bridge, digite um valor novo.
-        Deixe vazio para preservar o atual.
+        Tokens nunca aparecem no frontend. Para alterar o token da Bridge, digite um valor novo. Deixe vazio para
+        preservar o atual.
       </p>
 
       <div className="grid gap-2 md:grid-cols-2">
@@ -687,18 +628,14 @@ function LojaIntegrationPanel({
           <div className="flex items-center justify-between">
             <Label>Token da Bridge</Label>
             {tokenConfigurado && (
-              <span className="text-xs font-medium text-[color:oklch(0.55_0.15_150)]">
-                ✓ Token já configurado
-              </span>
+              <span className="text-xs font-medium text-[color:oklch(0.55_0.15_150)]">✓ Token já configurado</span>
             )}
           </div>
           <Input
             type="password"
             value={bridgeToken}
             onChange={(e) => setBridgeToken(e.target.value)}
-            placeholder={
-              tokenConfigurado ? "••••••• (deixe vazio para não alterar)" : "Cole o token"
-            }
+            placeholder={tokenConfigurado ? "••••••• (deixe vazio para não alterar)" : "Cole o token"}
             autoComplete="new-password"
           />
         </div>
@@ -717,11 +654,7 @@ function LojaIntegrationPanel({
           </div>
           <div>
             <Label>Terminal MaxData</Label>
-            <Input
-              value={terminal}
-              onChange={(e) => setTerminal(e.target.value)}
-              placeholder="36E1123..."
-            />
+            <Input value={terminal} onChange={(e) => setTerminal(e.target.value)} placeholder="36E1123..." />
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -740,10 +673,7 @@ function LojaIntegrationPanel({
             {bridgeResult && (
               <p>
                 <span className="font-semibold">Bridge:</span>{" "}
-                <Badge
-                  variant={bridgeResult.status === "online" ? "default" : "outline"}
-                  className="mr-1"
-                >
+                <Badge variant={bridgeResult.status === "online" ? "default" : "outline"} className="mr-1">
                   {bridgeResult.status}
                 </Badge>
                 {bridgeResult.mensagem}
@@ -752,10 +682,7 @@ function LojaIntegrationPanel({
             {maxResult && (
               <p>
                 <span className="font-semibold">MaxAPI:</span>{" "}
-                <Badge
-                  variant={maxResult.status === "online" ? "default" : "outline"}
-                  className="mr-1"
-                >
+                <Badge variant={maxResult.status === "online" ? "default" : "outline"} className="mr-1">
                   {maxResult.status}
                 </Badge>
                 {maxResult.mensagem}
@@ -821,9 +748,7 @@ function LogsTab() {
           <TableBody>
             {rows.map((l) => (
               <TableRow key={l.id}>
-                <TableCell className="text-xs">
-                  {new Date(l.created_at).toLocaleString("pt-BR")}
-                </TableCell>
+                <TableCell className="text-xs">{new Date(l.created_at).toLocaleString("pt-BR")}</TableCell>
                 <TableCell className="font-mono text-xs">{l.acao}</TableCell>
                 <TableCell className="text-xs">{l.entidade ?? "—"}</TableCell>
                 <TableCell className="text-xs">{l.loja_id?.slice(0, 8) ?? "—"}</TableCell>
@@ -851,19 +776,14 @@ function ContratoTab() {
       <CardHeader>
         <div className="flex items-center gap-2">
           <FileText className="h-4 w-4 text-primary" />
-          <CardTitle className="text-base">
-            Contrato de Integração (handoff Lovable → Claude Code)
-          </CardTitle>
+          <CardTitle className="text-base">Contrato de Integração (handoff Lovable → Claude Code)</CardTitle>
         </div>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
         <p>
-          Esta aba documenta o contrato entre o frontend (Lovable) e a camada de integração real
-          (Claude Code). O documento completo vive em{" "}
-          <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
-            docs/lovable-claude-handoff.md
-          </code>
-          .
+          Esta aba documenta o contrato entre o frontend (Lovable) e a camada de integração real (Claude Code). O
+          documento completo vive em{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5 text-xs">docs/lovable-claude-handoff.md</code>.
         </p>
         <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
           <li>Server functions são o único ponto de chamada do frontend.</li>
