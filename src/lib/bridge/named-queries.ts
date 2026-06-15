@@ -16,18 +16,18 @@
 // ---------------------------------------------------------------------------
 const SEARCH_PRODUCTS = `
 SELECT TOP 30
-  p.proId          AS proId,
-  p.proCodigo      AS proCodigo,
-  p.proDescricao   AS proDescricao,
+  p.proId            AS proId,
+  pe.proCodigo       AS proCodigo,
+  p.proDescricao     AS proDescricao,
   pe.proEstoqueAtual AS proEstoqueAtual,
-  p.proUn          AS proUn
+  p.proUn            AS proUn
 FROM produto p
 INNER JOIN produto_empresa pe ON pe.proId = p.proId AND pe.empId = @empId
 WHERE
-  p.proStatus <> 'I'
+  (pe.proDesativaProd IS NULL OR pe.proDesativaProd = 0)
   AND (
        p.proDescricao LIKE @termo
-    OR p.proCodigo    LIKE @termo
+    OR pe.proCodigo   LIKE @termo
   )
 ORDER BY p.proDescricao
 `;
@@ -38,11 +38,11 @@ ORDER BY p.proDescricao
 // ---------------------------------------------------------------------------
 const GET_PRODUCT_PHYSICAL_STOCK = `
 SELECT
-  p.proId          AS proId,
-  p.proCodigo      AS proCodigo,
-  p.proDescricao   AS proDescricao,
+  p.proId            AS proId,
+  pe.proCodigo       AS proCodigo,
+  p.proDescricao     AS proDescricao,
   pe.proEstoqueAtual AS proEstoqueAtual,
-  p.proUn          AS proUn
+  p.proUn            AS proUn
 FROM produto p
 INNER JOIN produto_empresa pe ON pe.proId = p.proId AND pe.empId = @empId
 WHERE p.proId = @proId
@@ -190,15 +190,15 @@ const GET_SERVICE_ORDER_ITEMS = `
 SELECT
   vdi.vdiId            AS itemId,
   vdi.vdiItemId        AS proId,
-  p.proCodigo          AS proCodigo,
-  p.proDescricao       AS proDescricao,
-  p.proUn              AS proUn,
+  COALESCE(pe.proCodigo, '') AS proCodigo,
+  vdi.vdiProNome       AS proDescricao,
+  vdi.vdiProUn         AS proUn,
   vdi.vdiQtde          AS qtde,
-  vdi.vdiPreco         AS precoUnitario,
-  (vdi.vdiQtde * vdi.vdiPreco) AS totalItem,
+  vdi.vdiValor         AS precoUnitario,
+  (vdi.vdiQtde * vdi.vdiValor) AS totalItem,
   vdi.vdiCancel        AS cancelado
 FROM vendaItem vdi
-INNER JOIN produto p ON p.proId = vdi.vdiItemId
+LEFT JOIN produto_empresa pe ON pe.proId = vdi.vdiItemId AND pe.empId = @empId
 WHERE vdi.vdiVedId = @osId
   AND vdi.vdiCancel = 0
 ORDER BY vdi.vdiId
@@ -237,7 +237,7 @@ const REGISTRY: Record<string, QueryDef> = {
   },
   GET_SERVICE_ORDER_ITEMS: {
     sql: GET_SERVICE_ORDER_ITEMS,
-    allowedParams: ["osId"],
+    allowedParams: ["osId", "empId"],
   },
 };
 

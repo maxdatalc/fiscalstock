@@ -246,12 +246,12 @@ export const getServiceOrderItems = createServerFn({ method: "POST" })
     });
     if (!canAccess) throw new Error("Acesso negado a esta loja");
 
-    const { bridge } = await getLojaConfig(supabaseAdmin, data.loja_id);
+    const { bridge, empId } = await getLojaConfig(supabaseAdmin, data.loja_id);
 
     const osId = parseInt(data.os_id, 10);
     if (isNaN(osId)) throw new Error("os_id inválido");
 
-    const { sql, params } = resolveNamedQuery("GET_SERVICE_ORDER_ITEMS", { osId });
+    const { sql, params } = resolveNamedQuery("GET_SERVICE_ORDER_ITEMS", { osId, empId });
     const rows = await queryBridge<OsItemRow>(bridge, sql, params);
 
     return rows.map((r) => ({
