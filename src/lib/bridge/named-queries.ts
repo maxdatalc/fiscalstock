@@ -140,7 +140,7 @@ SELECT
   v.vedId              AS vedId,
   v.vedNum             AS vedNum,
   COALESCE(c.cliNome, v.vedCliNome) AS clienteNome,
-  v.vedPlaca           AS placa,
+  ''                   AS placa,
   v.vedStatus          AS status,
   CONVERT(VARCHAR(23), v.vedAbertura, 126) AS dataAbertura,
   v.vedEquipamento     AS equipamento,
@@ -154,7 +154,6 @@ WHERE v.empId   = @empId
   AND v.vedStatus NOT IN ('Z')
   AND (@statusFilter = '' OR v.vedStatus = @statusFilter)
   AND (@clienteNome  = '' OR COALESCE(c.cliNome, v.vedCliNome) LIKE @clienteNome)
-  AND (@placa        = '' OR v.vedPlaca = @placa)
 ORDER BY v.vedAbertura DESC
 `;
 
@@ -167,7 +166,7 @@ SELECT
   v.vedNum             AS vedNum,
   v.vedCliId           AS clienteId,
   COALESCE(c.cliNome, v.vedCliNome) AS clienteNome,
-  v.vedPlaca           AS placa,
+  ''                   AS placa,
   v.vedStatus          AS status,
   CONVERT(VARCHAR(23), v.vedAbertura, 126) AS dataAbertura,
   v.vedEquipamento     AS equipamento,
@@ -228,7 +227,7 @@ const REGISTRY: Record<string, QueryDef> = {
   },
   LIST_SERVICE_ORDERS: {
     sql: LIST_SERVICE_ORDERS,
-    allowedParams: ["empId", "statusFilter", "clienteNome", "placa"],
+    allowedParams: ["empId", "statusFilter", "clienteNome"],
   },
   GET_SERVICE_ORDER_DETAIL: {
     sql: GET_SERVICE_ORDER_DETAIL,

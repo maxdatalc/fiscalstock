@@ -50,6 +50,8 @@ interface OsListRow {
   dataAbertura: string | null;
   obs: string | null;
   defeito: string | null;
+  equipamento: string | null;
+  marca: string | null;
 }
 
 interface OsDetailRow extends OsListRow {
@@ -164,7 +166,6 @@ export const listServiceOrders = createServerFn({ method: "POST" })
       empId,
       statusFilter: data.status && data.status !== "todas" ? displayToVedStatus(data.status) : "",
       clienteNome: data.cliente ? `%${data.cliente}%` : "",
-      placa: data.placa ?? "",
     });
 
     const rows = await queryBridge<OsListRow>(bridge, sql, params);
@@ -182,8 +183,8 @@ export const listServiceOrders = createServerFn({ method: "POST" })
       valorTotalServico: 0,
       obs: o.obs ?? "",
       defeito: o.defeito ?? "",
-      equipamento: "",
-      marca: "",
+      equipamento: o.equipamento ?? "",
+      marca: o.marca ?? "",
     }));
   });
 
